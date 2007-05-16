@@ -13,8 +13,8 @@ proc void Delta(BInt? in, BInt! out1, BInt! out2):
 	int32 value
 	while (true):		
 		in1.c ? value
-		out ! value
-		out2 ! value
+		out.c ! value
+		out2.c ! value
 			
 proc void Succ(BInt? in, BInt! out):
 	int32 value
@@ -22,8 +22,8 @@ proc void Succ(BInt? in, BInt! out):
 		in.c ? value
 		out.c ! value + 1
 		
-proc void Prefix(BInt? in, BInt! out):
-	int32 value = 0
+proc void Prefix(BInt? in, BInt! out, int32 initValue):
+	int32 value = initValue
 	out.c ! value
 	while (true):
 		in.c ? value
