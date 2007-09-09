@@ -1,10 +1,11 @@
-
+extern struct proc_tag;
+typedef struct proc_tag proc;
 
 // doubly linked list of procs
 typedef struct proc_node_tag 
 {
 	struct proc_node_tag * up, * down;
-	void * p;
+	struct proc * p;
 } proc_node;
 
 // push n to the front of the list, n becomes (*head)
@@ -143,6 +144,11 @@ proc_node * pl_remove(proc_node ** head, proc_node * n)
 	{
 		n->down->up = n->up;
 		n->up->down = n->down;
+		if( (*head) == n)
+		{
+			(*head) = n->down;
+		}
+
 	}
 
 	n->down = 0;
