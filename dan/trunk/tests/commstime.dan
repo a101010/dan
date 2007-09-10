@@ -6,7 +6,8 @@ import GetTimeNano from Time
 
 bundle BInt:
 	channel c ->
-	protocol = c ! int32 -> c ? int32 -> BInt
+	protocol = c ! int32 -> c ? int32 -> BInt // specified in CSP as a process
+
 
 
 proc void Delta(BInt? in, BInt! out1, BInt! out2):
