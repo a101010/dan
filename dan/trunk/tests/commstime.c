@@ -93,26 +93,53 @@ void proc_ctor(proc * p, char * proc_name, proc * parent, void * locals, OpProcB
 typedef void (*OpPoison)(void * chans);
 typedef int (*OpIsPoisoned)(void * chans); 
 
+
+// TODO bundle ends should be mobile by default, but have to develop the idea of a moble reference type in more detail first
 typedef struct bundle_end_tag
 {
-	OpPoison poison;
-	OpIsPoisoned isPoisoned;
-	void * ops;  // this layer of indirection could probably be removed, but at the cost of a lot of extra custom code  TODO consider as an optimization
-	void * chans;
+	OpPoison poison; // (public) the poison and isPoisoned ops apply to the entire bundle 
+	OpIsPoisoned isPoisoned; // public
+	// it turns out that ops cannot be used in a type independent manner, so there is no value in including it	
+	// void * ops; // (public) this is an array of ops, by channel index; each op structure includes poision isPoisoned, and either read or write for each channel
+	void * chans;  // (private) pointer to the channels backing store structure
 } bundle_end;
 
+
+// returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
+//typedef int (*OpChanRead_BInt_c_0)(BInt_chans * chans, int32 * value, char ** ex, proc * p, scheduler * s);
+
+
+
+// returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
+//typedef int (*OpChanWrite_BInt_c_0)(BInt_chans * chans, int32 value, void ** exception, proc * p, scheduler * s);
+
+
+
+
+// channels backing store for BInt channel bundle
 typedef struct BInt_chans_tag
 {
 	int is_poisoned; // 0 = false, 1 = true
-	int c_value; // will be a union if multiple types on the channel
-	int c_valid_value; // 0 if invalid, else the number of the type for the value of c that is valid (a channel can carry multiple types)
+	int32 c_value; // will be a union if multiple types on the channel
+	unsigned int c_valid_value; // 0 if invalid, else the number of the type for the value of c that is valid (a channel can carry multiple types) but in this case 1 is int32
 	proc * reader_waiting; // reader waiting to syncronize on the channel
 	proc * writer_waiting; // writer waiting to syncronize on the channel
+
 } BInt_chans;
 
-// returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
-typedef int (*OpChanRead_BInt_c_0)(BInt_chans * chans, int32 * value, char ** ex, proc * p, scheduler * s);
+// BInt_chans constructor
+BInt_chans * BInt_chans_ctor(BInt_chans * chans)
+{
+	chans->is_poisoned = 0;
+	chans->c_valid_value = 0;
+	chans->c_valid_value = 0;
+	chans->reader_waiting = 0;
+	chans->writer_waiting = 0;
+	return chans;
+}
 
+// there doesn't seem to be any general way to do channel read and write ops
+// returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
 int ChanRead_BInt_c_0(BInt_chans * chans, int32 * value, char ** exception, proc * p, scheduler * s)
 {
 	int ret_val = 2;
@@ -145,9 +172,9 @@ int ChanRead_BInt_c_0(BInt_chans * chans, int32 * value, char ** exception, proc
 	return ret_val;
 }
 
-// returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
-typedef int (*OpChanWrite_BInt_c_0)(BInt_chans * chans, int32 value, void ** exception, proc * p, scheduler * s);
 
+// there doesn't seem to be any general way to do channel read and write ops
+// returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
 int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc * p, scheduler * s)
 {
 	int ret_val = 2;
@@ -193,23 +220,46 @@ int IsPoisoned_BInt(void * chans)
 	return ((BInt_chans*)chans)->is_poisoned;
 }
 
-/*
-typedef struct BInt_c_reader_tag_0
-{
-	OpChanReadBInt0 read;
-	OpChanPoisonBInt0 poison;
-	BInt_chans * chans;
-} BInt_c_reader_0;
-*/
+// may not need; bundle_end may be sufficient
+//// reader end ops structure for BInt chan c
+//typedef struct BInt_c_reader_tag_0
+//{
+//	// can't get any polymorphism for read and write at this stage
+//	//OpChanReadBInt0 read; // public 
+//	OpChanPoisonBInt0 poison;  // public 
+//	OpChanIsPoisonedBInt0 isPoisoned; // public 
+//	BInt_chans * chans;  // private
+//} BInt_c_reader_0;
 
-/*
-typedef struct BInt_c_writer_tag_0
-{
-	OpChanWriterBInt0 write;
-	OpChanPoisonBInt0 poison;
-} BInt_c_writer_0;
-*/
+// may not need; bundle_end may be sufficient
+//// writer end ops structure for BInt chan c
+//typedef struct BInt_c_writer_tag_0
+//{
+//	// can't get any polymorphism for read and write at this stage
+//	//OpChanWriterBInt0 write;  // public
+//	OpChanPoisonBInt0 poison; // public
+//	OpChanIsPoisonedBInt0 isPoisoned; // public 
+//	BInt_chans * chans; // private
+//} BInt_c_writer_0;
 
+
+// BInt reader end constructor
+bundle_end * BInt_reader_end_ctor(bundle_end * rEnd, BInt_chans * chans)
+{
+	rEnd->chans = chans;
+	rEnd->isPoisoned = IsPoisoned_BInt;
+	rEnd->poison = Poison_BInt;
+	return rEnd;
+}
+
+// BInt writer end constructor TODO only need one bundle end constructor?
+bundle_end * BInt_writer_end_ctor(bundle_end * wrEnd, BInt_chans * chans)
+{
+	wrEnd->chans = chans;
+	wrEnd->isPoisoned = IsPoisoned_BInt;
+	wrEnd->poison = Poison_BInt;
+	return wrEnd;
+}
 
 #define NUM_Delta_BUNDLE_ENDS 3
 #define BUNDLE_END_Delta_in 0
@@ -376,26 +426,76 @@ Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end ** ends)
 typedef struct Prefix_locals_tag
 {
 	int32 value;
-	//bundle_end * __ends__[NUM_Prefix_BUNDLE_ENDS]; 
+	bundle_end * __ends__[NUM_Prefix_BUNDLE_ENDS]; 
 } Prefix_locals;
 
 // Prefix_locals constructor
-Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end ** ends, int32 initValue)
+Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bundle_end * out, int32 initValue)
 {
-	/*int i;
-	for(i = 0; i < NUM_Prefix_BUNDLE_ENDS; ++i)
-	{
-		locals->__ends__[i] = ends[i];
-	}*/
+	locals->__ends__[BUNDLE_END_Prefix_in] = in;
+	locals->__ends__[BUNDLE_END_Prefix_out] = out;
 	locals->value = initValue;
 }
 
 
 void Prefix_body(proc * p, scheduler * s)
 {
+	int result;
+
 	Prefix_locals * locals = (Prefix_locals*) p->locals;
-	printf("Prefix init value: %d\n", locals->value); 
-	p->state = _PS_CLEAN_EXIT_;
+	switch(p->state)
+	{
+	case _PS_READY_TO_RUN_:
+		printf("Prefix init value: %d\n", locals->value); 
+		// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
+		//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &(p->exception), p, s); 
+		switch(result)
+		{
+		case 0: // wrote value and synced
+			p->state = _PS_CLEAN_EXIT_;
+			break;
+		case 1: // wrote value and blocked
+			// TODO if it blocks we may need a write function that doesn't take a value to write
+			// for now, allow it to write again
+			p->state = _PS_READY_TO_RUN_ + 1;
+			break;
+		case 2: // exception was thrown
+			p->state = _PS_EXCEPTION_;
+			break;
+		default:
+			printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+		}
+		break;
+	case _PS_READY_TO_RUN_ + 1:
+		// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
+		//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &(p->exception), p, s); 
+		switch(result)
+		{
+		case 0: // wrote value and synced
+			p->state = _PS_CLEAN_EXIT_;
+			break;
+		case 1: // wrote value and blocked
+			// TODO if it blocks we may need a write function that doesn't take a value to write
+			// for now, allow it to write again
+			p->state = _PS_READY_TO_RUN_ + 1;
+			break;
+		case 2: // exception was thrown
+			p->state = _PS_EXCEPTION_;
+			break;
+		default:
+			printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+		}
+		break;
+	default:
+		printf("Unsupported process state in Prefix_body: %d\n", p->state);
+		p->exception = "Unsupported process state in Prefix_body\n";
+	}
 }
 
 
@@ -405,30 +505,60 @@ void Prefix_body(proc * p, scheduler * s)
 typedef struct Count_locals_tag
 {
 	int32 value;
-	//int32 time;
-	//bundle_end * __ends__[NUM_Count_BUNDLE_ENDS]; 
+	int32 step;
+	int32 time;
+	bundle_end * __ends__[NUM_Count_BUNDLE_ENDS];
 } Count_locals;
 
 // Count_locals constructor
-Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end ** ends)
+Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 {
-	locals->value = 42;
+	locals->__ends__[BUNDLE_END_Count_in] = in;
+	locals->step = 1;
 	return locals;
 }
 
 
 void Count_body(proc * p, scheduler * s)
 {
+	int result;
 	Count_locals * locals = p->locals;
-	printf("Count value: %d\n", locals->value);
-	p->state = _PS_CLEAN_EXIT_;
+	printf("Count step: %d\n", locals->step);
+	switch(p->state)
+	{
+	case _PS_READY_TO_RUN_ :
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
+		switch(result)
+		{
+		case 0 : // read value
+			printf("Count: read value %d\n", locals->value);
+			p->state = _PS_CLEAN_EXIT_;
+			break;
+		case 1 : // blocked
+			// let it read again
+			break;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			break;
+		default:
+			printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+		}
+		break;
+	default:
+		printf("Unsupported process state in Count_body: %d\n", p->state);
+		p->exception = "Unsupported process state in Count_body\n";
+	}
 }
 
 
 
 typedef struct Commstime_locals_tag
 {
-	//BInt_chans a;
+	BInt_chans a;
+	bundle_end a_reader;
+	bundle_end a_writer;
 	//BInt_chans b;
 	//BInt_chans c;
 	//BInt_chans d;
@@ -454,10 +584,16 @@ void Commstime_body(proc * p, scheduler * s)
 	switch(p->state)
 	{
 	case _PS_READY_TO_RUN_:
-		Count_locals_ctor( &(locals->pCount1_locals), 0);
+		BInt_chans_ctor( &(locals->a) );
+		BInt_reader_end_ctor( &(locals->a_reader), &(locals->a));
+		BInt_writer_end_ctor( &(locals->a_writer), &(locals->a));
+
+		Count_locals_ctor( &(locals->pCount1_locals), &(locals->a_reader));
 		proc_ctor( &(locals->pCount1), "Count", p, &(locals->pCount1_locals), Count_body);
-		Prefix_locals_ctor( &(locals->pPrefix1_locals), 0, 22);
+		
+		Prefix_locals_ctor( &(locals->pPrefix1_locals), 0, &(locals->a_writer), 22);
 		proc_ctor( &(locals->pPrefix1), "Prefix", p, &(locals->pPrefix1_locals), Prefix_body);
+		
 		s->schedule(s, &(locals->pPrefix1));
 		s->schedule(s, &(locals->pCount1));
 		p->state = _PS_READY_TO_RUN_ + 1;
@@ -594,7 +730,7 @@ int Schedule_default(scheduler * s, proc * p)
 		return 0;
 	}
 	
-	printf("Scheduling process %s\n", p->proc_name);
+	printf("Schedule_default: Scheduling process %s\n", p->proc_name);
 
 	_ctxt = (Scheduler_default*) s->ctxt;
 	if(p->sched_state == _BLOCKED_)
@@ -603,7 +739,7 @@ int Schedule_default(scheduler * s, proc * p)
 		result_node = pl_remove( &(_ctxt->unready), p->node);
 		if(result_node == 0)
 		{
-			printf("error: node could not be removed from the unready list\n");
+			printf("Schedule_default error: node could not be removed from the unready list\n");
 			unlock(p->spinlock);
 			return -1;
 		}
@@ -615,7 +751,7 @@ int Schedule_default(scheduler * s, proc * p)
 	{
 		if(_ctxt->next_proc_node >= _ctxt->proc_node_pool_size)
 		{
-			printf("proc_node pool exhausted\n");
+			printf("Schedule_default: proc_node pool exhausted\n");
 			unlock(p->spinlock);
 			return -1;
 		}
@@ -631,7 +767,7 @@ int Schedule_default(scheduler * s, proc * p)
 	}
 	else
 	{
-		printf("process in unexpected sched_state: %s\n", scheduler_state_to_string(p->sched_state));
+		printf("Schedule_default: process %s in unexpected sched_state: %s\n", p->proc_name, scheduler_state_to_string(p->sched_state));
 		return -1;
 	}
 	unlock(p->spinlock);
