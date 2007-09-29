@@ -5,11 +5,14 @@
 // A single processor version. 
 
 #include <stdio.h>
+#include <time.h>
 #include "list.h" 
 
 // spin locks are chatty no-ops right now  TODO use a flag for test and set rather than a string
-#define lock(spinlock) printf("lock %s\n", spinlock);
-#define unlock(spinlock) printf("unlock %s\n", spinlock);
+//#define lock(spinlock) printf("lock %s\n", spinlock);
+//#define unlock(spinlock) printf("unlock %s\n", spinlock);
+#define lock(spinlock)
+#define unlock(spinlock)
 
 typedef int int32;
 typedef unsigned int uint;
@@ -191,7 +194,7 @@ int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc 
 		chans->c_valid_value = 1;
 		if(chans->reader_waiting != 0)
 		{
-//			s->schedule(chans->reader_waiting);
+			s->schedule(s, chans->reader_waiting);
 			chans->reader_waiting = 0;
 			ret_val = 0;
 		}
@@ -207,12 +210,63 @@ int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc 
 	return ret_val;
 }
 
+// In this case the value has already been written, we're just checking to make sure it has been read
+int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, scheduler * s)
+{
+	int ret_val = 2;
+	// TODO get the lock
+	if(chans->is_poisoned)
+	{
+		// TODO make exceptions something other than just plain strings (& null terminated at that!)
+		*exception = (void*) "channel poison";
+	}
+	else
+	{
+		if(chans->reader_waiting != 0)
+		{
+			s->schedule(s, chans->reader_waiting);
+			chans->reader_waiting = 0;
+			ret_val = 0;
+		}
+		else
+		{
+			if(chans->c_valid_value == 0)
+			{
+				ret_val = 0;
+			}
+			else
+			{
+				chans->writer_waiting = p;
+				ret_val = 1;
+			}
+		}
+	}
+
+	// TODO release the lock
+	return ret_val;
+}
+
 // the need for an implementation of Poison and IsPoisoned for each bundle type
 // can probably be simplified by another layer of indirection, but is it worth it?
 
-void Poison_BInt(void * chans)
+void Poison_BInt_writer(void * chans, scheduler * s)
 {
 	((BInt_chans*)chans)->is_poisoned = 1;
+	if( 0 != ((BInt_chans*)chans)->reader_waiting)
+	{
+		s->schedule(s, ((BInt_chans*)chans)->reader_waiting);
+		((BInt_chans*)chans)->reader_waiting = 0;
+	}
+}
+
+void Poison_BInt_reader(void * chans, scheduler * s)
+{
+	((BInt_chans*)chans)->is_poisoned = 1;
+	if( 0 != ((BInt_chans*)chans)->writer_waiting)
+	{
+		s->schedule(s, ((BInt_chans*)chans)->writer_waiting);
+		((BInt_chans*)chans)->writer_waiting = 0;
+	}
 }
 
 int IsPoisoned_BInt(void * chans)
@@ -248,7 +302,7 @@ bundle_end * BInt_reader_end_ctor(bundle_end * rEnd, BInt_chans * chans)
 {
 	rEnd->chans = chans;
 	rEnd->isPoisoned = IsPoisoned_BInt;
-	rEnd->poison = Poison_BInt;
+	rEnd->poison = Poison_BInt_reader;
 	return rEnd;
 }
 
@@ -257,7 +311,7 @@ bundle_end * BInt_writer_end_ctor(bundle_end * wrEnd, BInt_chans * chans)
 {
 	wrEnd->chans = chans;
 	wrEnd->isPoisoned = IsPoisoned_BInt;
-	wrEnd->poison = Poison_BInt;
+	wrEnd->poison = Poison_BInt_writer;
 	return wrEnd;
 }
 
@@ -271,80 +325,151 @@ typedef struct Delta_locals_tag
 	bundle_end * __ends__[3]; 
 } Delta_locals;
 
-#ifdef Fool
+
 proc * Delta_body(proc * p, scheduler * s)
 {
-	Delta_locals * locals = (Delta_locals*) p->locals;
-	int i;
-	while(1) // while not exiting, blocked, or throwing an exception; rather than setting flags merely returns for those cases
+	int result;
+	Delta_locals* locals = (Delta_locals*) p->locals;
+	int blocked = 0; // blocked really just means 'return to the scheduler' here
+	while(!blocked)
 	{
-		switch(p->state) 
+		switch(p->state)
 		{
-				 
-			case _PS_READY_TO_RUN_ : 
-				retval = locals->__ends__[0]->read(__ends__[0]->chans, *(locals->value), p->exception);
-				switch(retval)
-				{
-					case 0 : // got a value
-						p->state = _PS_READY_TO_RUN_ + 1;
-						break;
-					case 1 : // blocked waiting for a value
-						return p;
-					case 2 : // caught an exception
-						// TODO poison channels here? or let the scheduler handle it? pro: we have the locals and could save space in p; con: we save code size if the scheduler handles it for all procs (I'm currently leaning to handling in the proc_body
-						return p;
-					default:
-						// TODO throw an exception?
-				}
+		case _PS_READY_TO_RUN_:
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_in]->chans, &(locals->value), &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // read value
+				printf("Delta: read value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 1;
 				break;
-			case _PS_READY_TO_RUN_ + 1 : 
-				retval = locals->__ends__[1]->write(__ends__[1]->chans, locals->value, p->exception);
-				switch(retval)
-				{
-					case 0 : // sent the value
-						p->state = _PS_READY_TO_RUN_ + 2;
-						break;
-					case 1 : // blocked waiting to send
-						return p;
-					case 2 : // caught an exception
-						// TODO poison channels here? or let the scheduler handle it? pro: we have the locals and could save space in p; con: we save code size if the scheduler handles it for all procs (I'm currently leaning to handling in the proc_body
-						return p;
-					default:
-						// TODO throw an exception?
-				}
+			case 1 : // blocked
+				// let it read again
+				blocked = 1;
 				break;
-			case _PS_READY_TO_RUN_ + 2 : 
-				retval = locals->__ends__[2]->write(__ends__[2]->chans, locals->value, p->exception);
-				switch(retval)
-				{
-					case 0 : // sent the value
-						p->state = _PS_READY_TO_RUN_;
-						break;
-					case 1 : // blocked waiting to send
-						return p;
-					case 2 : // caught an exception
-						// TODO poison channels here? or let the scheduler handle it? pro: we have the locals and could save space in p; con: we save code size if the scheduler handles it for all procs (I'm currently leaning to handling in the proc_body
-						return p;
-					default:
-						// TODO throw an exception?
-				}
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
 				break;
-			default : 
-				// TODO throw an exception?
-				
+			default:
+				printf("unexpected result from ChanRead_BInt_c_0 in Delta_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanRead_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				blocked = 1;
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 1:
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, locals->value, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Delta: wrote value %d to out1\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 3;
+				break;
+			case 1 : // blocked
+				p->state = _PS_READY_TO_RUN_ + 2;
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				blocked = 1;
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 2:
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Delta: wrote value %d to out1\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 3;
+				break;
+			case 1 : // blocked
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				blocked = 1;
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 3:
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, locals->value, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Delta: wrote value %d to out2\n", locals->value);
+				p->state = _PS_READY_TO_RUN_;
+				break;
+			case 1 : // blocked
+				p->state = _PS_READY_TO_RUN_ + 4;
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				blocked = 1;
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 4:
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Delta: wrote value %d to out2\n", locals->value);
+				p->state = _PS_READY_TO_RUN_;
+				break;
+			case 1 : // blocked
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				blocked = 1;
+			}
+			break;
+		default:
+			printf("Unsupported process state in Delta_body: %d\n", p->state);
+			p->exception = "Unsupported process state in Delta_body\n";
+			blocked = 1;
 		}
-	}	
+	}
+
+	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
+	{
+		locals->__ends__[BUNDLE_END_Delta_in]->poison(locals->__ends__[BUNDLE_END_Delta_in]->chans, s);
+		locals->__ends__[BUNDLE_END_Delta_out1]->poison(locals->__ends__[BUNDLE_END_Delta_out1]->chans, s);
+		locals->__ends__[BUNDLE_END_Delta_out2]->poison(locals->__ends__[BUNDLE_END_Delta_out2]->chans, s);
+	}
 }
-#endif
+
 
 // Delta_locals constructor
-Delta_locals * Delta_locals_ctor(Delta_locals * locals, bundle_end ** ends, int num_ends)
+Delta_locals * Delta_locals_ctor(Delta_locals * locals, bundle_end* in, bundle_end* out1, bundle_end* out2)
 {
-	int i;
-	for(i = 0; i < num_ends; ++i)
-	{
-		locals->__ends__[i] = ends[i];
-	}
+	locals->__ends__[BUNDLE_END_Delta_in] = in;
+	locals->__ends__[BUNDLE_END_Delta_out1] = out1;
+	locals->__ends__[BUNDLE_END_Delta_out2] = out2;
 }
 
 #define NUM_Succ_BUNDLE_ENDS 2
@@ -357,66 +482,107 @@ typedef struct Succ_locals_tag
 } Succ_locals;
 
 
-#ifdef Fool
+
 proc * Succ_body(proc * p, scheduler *s)
 {
-	proc * retval;
-	Succ_locals * locals = (Succ_locals*) p->locals;
-	int i;
-	while(1) // while not exiting, blocked, or throwing an exception; rather than setting flags merely returns for those cases
+	int result;
+	Succ_locals* locals = (Succ_locals*) p->locals;
+	int blocked = 0;
+	while(!blocked)
 	{
 		switch(p->state)
 		{
-			case _PS_READY_TO_RUN_ : 
-				retval = locals->__ends__[0]->read(__ends__[0]->chans, *(locals->value), p->exception);
-				switch(retval)
-				{
-					case 0 : // got a value
-						locals->value = locals->value + 1;
-						p->state = _PS_READY_TO_RUN_ + 1;
-						break;
-					case 1 : // blocked waiting for a value
-						return p;
-					case 2 : // caught an exception
-						// TODO poison channels here? or let the scheduler handle it? pro: we have the locals and could save space in p; con: we save code size if the scheduler handles it for all procs (I'm currently leaning to handling in the proc_body
-						return p;
-					default:
-						// TODO throw an exception?
-				}
+		case _PS_READY_TO_RUN_:
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_in]->chans, &(locals->value), &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // read value
+				printf("Succ: read value %d\n", locals->value);
+				++(locals->value);
+				p->state = _PS_READY_TO_RUN_ + 1;
 				break;
-			case _PS_READY_TO_RUN_ + 1 : 
-				retval = locals->__ends__[1]->write(__ends__[1]->chans, locals->value, p->exception);
-				switch(retval)
-				{
-					case 0 : // sent the value
-						p->state = _PS_READY_TO_RUN_;
-						break;
-					case 1 : // blocked waiting to send
-						return p;
-					case 2 : // caught an exception
-						// TODO poison channels here? or let the scheduler handle it? pro: we have the locals and could save space in p; con: we save code size if the scheduler handles it for all procs (I'm currently leaning to handling in the proc_body
-						return p;
-					default:
-						// TODO throw an exception?
-				}
+			case 1 : // blocked
+				// let it read again
+				blocked = 1;
 				break;
-			default : 
-				// TODO throw an exception?
-				
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanRead_BInt_c_0 in Succ_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				p->exception = "unexpected result from ChanRead_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 1:
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, locals->value, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Succ: wrote value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_;
+				break;
+			case 1 : // blocked
+				p->state = _PS_EXCEPTION_ + 2;
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Succ_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 2:
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Succ: wrote value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_;
+				break;
+			case 1 : // blocked
+				// let it try writing again
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Succ_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
+			break;
+		default:
+			printf("Unsupported process state in Succ_body: %d\n", p->state);
+			p->exception = "Unsupported process state in Succ_body\n";
+			blocked = 1;
 		}
 	}
+
+	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
+	{
+		locals->__ends__[BUNDLE_END_Succ_in]->poison(locals->__ends__[BUNDLE_END_Succ_in]->chans, s);
+		locals->__ends__[BUNDLE_END_Succ_out]->poison(locals->__ends__[BUNDLE_END_Succ_out]->chans, s);
+	}
 }
-#endif
+
 
 
 // Succ_locals constructor
-Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end ** ends)
+Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end* in, bundle_end* out)
 {
-	int i;
-	for(i = 0; i < NUM_Succ_BUNDLE_ENDS; ++i)
-	{
-		locals->__ends__[i] = ends[i];
-	}
+	locals->__ends__[BUNDLE_END_Succ_in] = in;
+	locals->__ends__[BUNDLE_END_Succ_out] = out;
 }
 
 
@@ -441,60 +607,124 @@ Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bund
 void Prefix_body(proc * p, scheduler * s)
 {
 	int result;
+	int blocked = 0;
 
 	Prefix_locals * locals = (Prefix_locals*) p->locals;
-	switch(p->state)
+
+	while(!blocked)
 	{
-	case _PS_READY_TO_RUN_:
-		printf("Prefix init value: %d\n", locals->value); 
-		// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
-		//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &(p->exception), p, s); 
-		switch(result)
+		switch(p->state)
 		{
-		case 0: // wrote value and synced
-			p->state = _PS_CLEAN_EXIT_;
+		case _PS_READY_TO_RUN_:
+			printf("Prefix init value: %d\n", locals->value); 
+			// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
+			//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &(p->exception), p, s); 
+			switch(result)
+			{
+			case 0: // wrote value and synced
+				p->state = _PS_READY_TO_RUN_ + 2;
+				printf("Prefix wrote value %d\n", locals->value);
+				break;
+			case 1: // wrote value and blocked
+				p->state = _PS_READY_TO_RUN_ + 1;
+				blocked = 1;
+				break;
+			case 2: // exception was thrown
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
 			break;
-		case 1: // wrote value and blocked
-			// TODO if it blocks we may need a write function that doesn't take a value to write
-			// for now, allow it to write again
-			p->state = _PS_READY_TO_RUN_ + 1;
+		case _PS_READY_TO_RUN_ + 1:
+			// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
+			//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, &(p->exception), p, s); 
+			switch(result)
+			{
+			case 0: // wrote value and synced
+				p->state = _PS_READY_TO_RUN_ + 2;
+				printf("Prefix wrote value %d\n", locals->value);
+				break;
+			case 1: // wrote value and blocked
+				p->state = _PS_READY_TO_RUN_ + 1;
+				blocked = 1;
+				break;
+			case 2: // exception was thrown
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
 			break;
-		case 2: // exception was thrown
-			p->state = _PS_EXCEPTION_;
+		case _PS_READY_TO_RUN_ + 2:
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_in]->chans, &(locals->value), &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // read value
+				printf("Prefix: read value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 3;
+				break;
+			case 1 : // blocked
+				// let it read again
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanRead_BInt_c_0 in Prefix_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1; 
+				p->exception = "unexpected result from ChanRead_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
+			break;
+		case _PS_READY_TO_RUN_ + 3:
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Prefix: wrote value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 2;
+				break;
+			case 1 : // blocked
+				// let it try writing again
+				p->state = _PS_READY_TO_RUN_ + 1;
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
 			break;
 		default:
-			printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+			printf("Unsupported process state in Prefix_body: %d\n", p->state);
+			p->exception = "Unsupported process state in Prefix_body\n";
 			p->state = _PS_EXCEPTION_;
-			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			blocked = 1;
 		}
-		break;
-	case _PS_READY_TO_RUN_ + 1:
-		// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
-		//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &(p->exception), p, s); 
-		switch(result)
-		{
-		case 0: // wrote value and synced
-			p->state = _PS_CLEAN_EXIT_;
-			break;
-		case 1: // wrote value and blocked
-			// TODO if it blocks we may need a write function that doesn't take a value to write
-			// for now, allow it to write again
-			p->state = _PS_READY_TO_RUN_ + 1;
-			break;
-		case 2: // exception was thrown
-			p->state = _PS_EXCEPTION_;
-			break;
-		default:
-			printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
-			p->state = _PS_EXCEPTION_;
-			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-		}
-		break;
-	default:
-		printf("Unsupported process state in Prefix_body: %d\n", p->state);
-		p->exception = "Unsupported process state in Prefix_body\n";
+	}
+
+	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
+	{
+		locals->__ends__[BUNDLE_END_Prefix_in]->poison(locals->__ends__[BUNDLE_END_Prefix_in]->chans, s);
+		locals->__ends__[BUNDLE_END_Prefix_out]->poison(locals->__ends__[BUNDLE_END_Prefix_out]->chans, s);
 	}
 }
 
@@ -505,8 +735,11 @@ void Prefix_body(proc * p, scheduler * s)
 typedef struct Count_locals_tag
 {
 	int32 value;
+	int32 i;
 	int32 step;
 	int32 time;
+	time_t time1;
+	time_t time2;
 	bundle_end * __ends__[NUM_Count_BUNDLE_ENDS];
 } Count_locals;
 
@@ -514,7 +747,7 @@ typedef struct Count_locals_tag
 Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 {
 	locals->__ends__[BUNDLE_END_Count_in] = in;
-	locals->step = 1;
+	locals->step = 5000;
 	return locals;
 }
 
@@ -522,33 +755,114 @@ Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 void Count_body(proc * p, scheduler * s)
 {
 	int result;
+	int blocked = 0;
 	Count_locals * locals = p->locals;
 	printf("Count step: %d\n", locals->step);
-	switch(p->state)
+	while(!blocked)
 	{
-	case _PS_READY_TO_RUN_ :
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
-		switch(result)
+		switch(p->state)
 		{
-		case 0 : // read value
-			printf("Count: read value %d\n", locals->value);
-			p->state = _PS_CLEAN_EXIT_;
+		case _PS_READY_TO_RUN_ :
+			// initializing the loop
+			locals->i = 0;
+			// TODO use high-performance counters
+			time( &(locals->time1));
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // read value
+				printf("Count: read value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 2;
+				break;
+			case 1 : // blocked
+				p->state = _PS_READY_TO_RUN_ + 1;
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				blocked = 1;
+			}
 			break;
-		case 1 : // blocked
-			// let it read again
+
+		case _PS_READY_TO_RUN_ + 1:
+			// when we are re-reading a channel
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // read value
+				printf("Count: read value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 2;
+				break;
+			case 1 : // blocked
+				// let it read again
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
 			break;
-		case 2 : // exception
-			p->state = _PS_EXCEPTION_;
+		case _PS_READY_TO_RUN_ + 2:
+			// when we are incrementing i and checking the loop
+			if(locals->i >= locals->step)
+			{
+				time( &(locals->time2));
+				locals->time = (int32) (locals->time2 - locals->time1);	
+				printf("got %d iterations in %d seconds\n", locals->step, locals->time);
+				// TODO print traditional commstime stats
+
+				// for now, just exit cleanly
+				p->state = _PS_CLEAN_EXIT_;
+				blocked = 1;
+				break;
+
+				// initialize the next iteration
+				//locals->i = 0;
+				//time( &(locals->time1));
+			}
+			++(locals->i);
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // read value
+				printf("Count: read value %d\n", locals->value);
+				p->state = _PS_READY_TO_RUN_ + 2;
+				break;
+			case 1 : // blocked
+				// let it read again
+				p->state = _PS_READY_TO_RUN_ + 1;
+				blocked = 1;
+				break;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				blocked = 1;
+				break;
+			default:
+				printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			}
 			break;
 		default:
-			printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
-			p->state = _PS_EXCEPTION_;
-			p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			printf("Unsupported process state in Count_body: %d\n", p->state);
+			p->exception = "Unsupported process state in Count_body\n";
 		}
-		break;
-	default:
-		printf("Unsupported process state in Count_body: %d\n", p->state);
-		p->exception = "Unsupported process state in Count_body\n";
+	}
+
+	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
+	{
+		locals->__ends__[BUNDLE_END_Count_in]->poison(locals->__ends__[BUNDLE_END_Count_in]->chans, s);
 	}
 }
 
@@ -559,11 +873,19 @@ typedef struct Commstime_locals_tag
 	BInt_chans a;
 	bundle_end a_reader;
 	bundle_end a_writer;
-	//BInt_chans b;
-	//BInt_chans c;
-	//BInt_chans d;
-	//proc pDelta1;
-	//proc pSucc1;
+	BInt_chans b;
+	bundle_end b_reader;
+	bundle_end b_writer;
+	BInt_chans c;
+	bundle_end c_reader;
+	bundle_end c_writer;
+	BInt_chans d;
+	bundle_end d_reader;
+	bundle_end d_writer;
+	proc pDelta1;
+	Delta_locals pDelta1_locals;
+	proc pSucc1;
+	Succ_locals pSucc1_locals;
 	proc pPrefix1;
 	Prefix_locals pPrefix1_locals;
 	proc pCount1;
@@ -580,6 +902,7 @@ Commstime_locals * Commstime_locals_ctor(Commstime_locals * locals, int testInt)
 void Commstime_body(proc * p, scheduler * s)
 {
 	int finished = 0;
+	int exception = 0;
 	Commstime_locals * locals = (Commstime_locals*) p->locals;
 	switch(p->state)
 	{
@@ -588,52 +911,139 @@ void Commstime_body(proc * p, scheduler * s)
 		BInt_reader_end_ctor( &(locals->a_reader), &(locals->a));
 		BInt_writer_end_ctor( &(locals->a_writer), &(locals->a));
 
-		Count_locals_ctor( &(locals->pCount1_locals), &(locals->a_reader));
+		BInt_chans_ctor( &(locals->b) );
+		BInt_reader_end_ctor( &(locals->b_reader), &(locals->b));
+		BInt_writer_end_ctor( &(locals->b_writer), &(locals->b));
+
+		BInt_chans_ctor( &(locals->c) );
+		BInt_reader_end_ctor( &(locals->c_reader), &(locals->c));
+		BInt_writer_end_ctor( &(locals->c_writer), &(locals->c));
+
+		BInt_chans_ctor( &(locals->d) );
+		BInt_reader_end_ctor( &(locals->d_reader), &(locals->d));
+		BInt_writer_end_ctor( &(locals->d_writer), &(locals->d));
+
+		Delta_locals_ctor( &(locals->pDelta1_locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
+		proc_ctor( &(locals->pDelta1), "Delta", p, &(locals->pDelta1_locals), Delta_body);
+
+		Count_locals_ctor( &(locals->pCount1_locals), &(locals->b_reader));
 		proc_ctor( &(locals->pCount1), "Count", p, &(locals->pCount1_locals), Count_body);
 		
-		Prefix_locals_ctor( &(locals->pPrefix1_locals), 0, &(locals->a_writer), 22);
+		Prefix_locals_ctor( &(locals->pPrefix1_locals), &(locals->d_reader), &(locals->a_writer), 22);
 		proc_ctor( &(locals->pPrefix1), "Prefix", p, &(locals->pPrefix1_locals), Prefix_body);
+
+		Succ_locals_ctor( &(locals->pSucc1_locals), &(locals->c_reader), &(locals->d_writer));
+		proc_ctor( &(locals->pSucc1), "Succ", p, &(locals->pSucc1_locals), Succ_body);
 		
 		s->schedule(s, &(locals->pPrefix1));
+		s->schedule(s, &(locals->pDelta1));
+		s->schedule(s, &(locals->pSucc1));
 		s->schedule(s, &(locals->pCount1));
 		p->state = _PS_READY_TO_RUN_ + 1;
+
 		break;
 	case _PS_READY_TO_RUN_ + 1:
 		
 
 		lock(locals->pCount1.spinlock);
 		if(locals->pCount1.sched_state == _FINISHED_)
+		{
 			finished += 1;
+			if(locals->pCount1.state == _PS_EXCEPTION_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = locals->pCount1.exception;
+				printf("Commstime caught exception from pCount1\n");
+
+			}
+			else if(locals->pCount1.state !=  _PS_CLEAN_EXIT_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = "Commstime: pCount1 didn't exit cleanly, but didn't throw exception\n";
+			}
+		}
 		unlock(locals->pCount1.spinlock);
 
 		lock(locals->pPrefix1.spinlock);
 		if(locals->pPrefix1.sched_state == _FINISHED_)
+		{
 			finished += 1;
+			if(locals->pPrefix1.state == _PS_EXCEPTION_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = locals->pPrefix1.exception;
+				printf("Commstime caught exception from pPrefix1\n");
+
+			}
+			else if(locals->pPrefix1.state !=  _PS_CLEAN_EXIT_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = "Commstime: pPrefix1 didn't exit cleanly, but didn't throw exception\n";
+			}
+		}
 		unlock(locals->pPrefix1.spinlock);
 
-		if(finished == 2)
+		lock(locals->pSucc1.spinlock);
+		if(locals->pSucc1.sched_state == _FINISHED_)
+		{
+			finished += 1;
+			if(locals->pSucc1.state == _PS_EXCEPTION_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = locals->pSucc1.exception;
+				printf("Commstime caught exception from pSucc1\n");
+
+			}
+			else if(locals->pSucc1.state !=  _PS_CLEAN_EXIT_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = "Commstime: pSucc1 didn't exit cleanly, but didn't throw exception\n";
+			}
+		}
+		unlock(locals->pSucc1.spinlock);
+
+		lock(locals->pDelta1.spinlock);
+		if(locals->pDelta1.sched_state == _FINISHED_)
+		{
+			finished += 1;
+			if(locals->pDelta1.state == _PS_EXCEPTION_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = locals->pDelta1.exception;
+				printf("Commstime caught exception from pDelta1\n");
+			}
+			else if(locals->pDelta1.state !=  _PS_CLEAN_EXIT_)
+			{
+				exception += 1;
+				p->state = _PS_EXCEPTION_;
+				p->exception = "Commstime: pDelta1 didn't exit cleanly, but didn't throw exception\n";
+			}
+		}
+		unlock(locals->pDelta.spinlock);
+
+		if(exception > 0)
+		{
+			printf("Commstime: exceptions from %d processes, retiring the other processes in the par\n", exception);
+			// TODO what is the best way to clean up all the processes?
+		}
+
+		if(finished == 4)
 		{
 			if(locals->pCount1.state == _PS_CLEAN_EXIT_
-				&& locals->pPrefix1.state == _PS_CLEAN_EXIT_)
+				&& locals->pPrefix1.state == _PS_CLEAN_EXIT_
+				&& locals->pSucc1.state == _PS_CLEAN_EXIT_
+				&& locals->pDelta1.state == _PS_CLEAN_EXIT_)
 			{
 				p->state = _PS_CLEAN_EXIT_;
 				printf("Commstime exiting cleanly\n");
 			}
-			else
-			{
-				p->state = _PS_EXCEPTION_;
-
-				if(locals->pCount1.state == _PS_EXCEPTION_)
-					printf("Commstime caught exception from pCount1\n");
-				else if(locals->pCount1.state !=  _PS_CLEAN_EXIT_)
-					printf("Commstime pCount1 didn't exit cleanly, but didn't throw exception\n");
-
-				if(locals->pPrefix1.state == _PS_EXCEPTION_)
-					printf("Commstime caught exception from pPrefix1\n");
-				else if(locals->pPrefix1.state != _PS_EXCEPTION_)
-					printf("Commstime pPrefix1 didn't exit cleanly, but didn't throw exception\n");
-			}
-
 		}
 		break;
 	default:
