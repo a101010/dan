@@ -1,0 +1,91 @@
+// Copyright 2009, Alan Grover
+
+// This is a sample of prototype Danger implementing the infamous commstime program.
+
+// It simplifies commstime2.dan by leaving out conditional compilation and GetTimeNano,
+// and makes bundle end types a subtype of the bundle type.  It also dispenses with the 
+// bundle end extraction operator, making the ends of the bundle members of the bundle.
+// yo!
+
+//import GetTimeNano from Time;
+
+bundle BInt
+{
+	channel int32 c ->;
+	// eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
+}
+
+proc void Delta(BInt.Read in, BInt.Write out1, BInt.Write out2)
+{
+	int32 value;
+	while (true)
+	{		
+		in.c ? value;
+		out.c ! value;
+		out2.c ! value;
+	}
+}
+			
+proc void Succ(BInt.Read in, BInt.Write out)
+{
+	int32 value;
+	while (true)
+	{
+		in.c ? value;
+		out.c ! value + 1;
+	}
+}
+		
+proc void Prefix(BInt.Read in, BInt.Write out, int32 initValue)
+{
+	int32 value = initValue;
+	out.c ! value;
+	while (true)
+	{
+		in.c ? value;
+		out.c ! value;
+	}
+}
+
+proc void Count(BInt.Read in)
+{
+	int32 value;
+	int32 step = 100000;
+//	cif(debug)
+//	{
+//		int32 time; // in nanoseconds
+//	}
+	while (true)
+	{
+		int32 i = 0;
+//		cif(debug)
+//		{
+//			time = GetTimeNano();
+//		}
+		while (i < step)
+		{
+			in.c ? value;
+			i = i + 1;
+		}
+//		cif(debug)
+//		{
+//			time = GetTimeNano() - time;
+//			debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
+//			debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
+//		}
+	}
+}
+		
+		
+[main]
+proc void Commstime()
+{
+	BInt a, b, c, d;
+	par
+	{
+		Prefix(d.Read, a.Write);
+		Delta(a.Read, b.Write, c.Write);
+		Succ(c.Read, d.Write);
+		Count(b.Read);
+	}
+}		
