@@ -5,7 +5,6 @@
 // It simplifies commstime2.dan by leaving out conditional compilation and GetTimeNano,
 // and makes bundle end types a subtype of the bundle type.  It also dispenses with the 
 // bundle end extraction operator, making the ends of the bundle members of the bundle.
-// yo!
 
 //import GetTimeNano from Time;
 
