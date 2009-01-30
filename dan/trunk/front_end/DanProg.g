@@ -26,11 +26,13 @@ tokens
 
 @header 
 {
-
+import java.util.HashMap;
+import dan.types.*;
 }
 
 @members 
 {
+	public HashMap<String, DanType> types = new HashMap<String, DanType>();
 }
 
 prog		: imports decs;

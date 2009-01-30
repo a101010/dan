@@ -1,22 +1,42 @@
+
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
+import java.io.File;
+import dan.types.*;
 
-public class DanProgTest
-{
-	public static void main(String [] args) throws Exception
-	{
-		ANTLRInputStream input = new ANTLRInputStream(System.in);
+/**
+ * 
+ * @author Alan
+ */
+public class DanProgTest {
 
-		DanProgLexer lexer = new DanProgLexer(input);
+    public static void main(String[] args) throws Exception {
+        File workingDir = new File(".");
+        System.out.println("Starting dan in: " + workingDir.getCanonicalPath());
 
-		CommonTokenStream tokens = new CommonTokenStream(lexer);
+        //File inputFile = new File(args[0]);
+        ANTLRFileStream input = new ANTLRFileStream(args[0]);
 
-		DanProgParser parser = new DanProgParser(tokens);
+        //ANTLRInputStream input = new ANTLRInputStream(System.in);
 
-		DanProgParser.prog_return result = parser.prog();
+        DanProgLexer lexer = new DanProgLexer(input);
 
-		Tree t = (Tree) result.getTree();
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
 
-		System.out.println(t.toStringTree());
-	}
+        DanProgParser parser = new DanProgParser(tokens);
+        
+        // Initialize the builtin types
+        for(BuiltinType.Builtins b : BuiltinType.Builtins.values()){
+            // duplicate for upper and lower case
+            BuiltinType bType = new BuiltinType(b);
+            parser.types.put(b.name(), bType);
+            parser.types.put(b.name().toLowerCase(), bType);
+        }
+
+        DanProgParser.prog_return result = parser.prog();
+
+        Tree t = (Tree) result.getTree();
+
+        System.out.println(t.toStringTree());
+    }
 }
