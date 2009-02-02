@@ -8,7 +8,7 @@ package dan.types;
 
 import java.util.ArrayList;
 import org.antlr.runtime.Token;
-import dan.system.NotImplementedException;
+import dan.system.*;
 
 // Bundles produce a plethora of types.
 // Each bundle end has a type, each channel in the bundle
@@ -37,7 +37,7 @@ import dan.system.NotImplementedException;
 //  Channel end types
 public class BundleType extends DanType {
 
-    public ArrayList<ChannelType> Channels;
+    public ArrayList<ChanDec> Channels;
     public final BundleEndType Reader;
     public final BundleEndType Writer;
     

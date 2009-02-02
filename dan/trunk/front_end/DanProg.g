@@ -53,7 +53,21 @@ declaration	:   decChoice -> ^(DECLARATION decChoice)
     
 decChoice 	: procDec | bundleDec;
 
-bundleDec 	: 'bundle' ID bundle_body 
+bundleDec 	
+	scope 
+	{
+	ArrayList<ChanDec> channels;
+	ArrayList<Vardec> writerEnds;
+	ArrayList<Vardec> readerEnds;
+	}
+	@init
+	{
+	$bundleDec::channels = new ArrayList<ChanDec>();
+	$bundleDec::writerEnds = new ArrayList<Vardec>();
+	$bundleDec::readerEnds = new ArrayList<Vardec>();
+	}
+	: 'bundle' ID bundle_body 
+	
 	{
 	BundleType.ValidateName($ID);
 	BundleEndType readerEnd = new BundleEndType($ID, BundleEndType.Directions.Reader);
@@ -61,10 +75,14 @@ bundleDec 	: 'bundle' ID bundle_body
 	BundleType bundle = new BundleType($ID, writerEnd, readerEnd);
 	if(types.containsKey($ID)){
 		throw new TypeException($ID, "type already declared");
-	} else {
+	} 
+	else {
 		types.put(bundle.getName(), bundle);
 		types.put(readerEnd.getName(), readerEnd);
 		types.put(writerEnd.getName(), writerEnd);
+		bundle.Channels = $bundleDec::channels;
+		writerEnd.ChanEnds = $bundleDec::writerEnds;
+		readerEnd.ChanEnds = $bundleDec::readerEnds;
 	}
 	} -> ^('bundle' ID bundle_body);
 
@@ -129,7 +147,21 @@ channel_dec 	: 'channel' proto_type=ID name=ID channel_dir STMT_END
 		types.put(writerType.getName(), writerType);
 		
 	}
-	// TODO we need to add these types to the enclosing bundle types
+	ChanDec chanDec = new ChanDec(channelType, $name, $channel_dir.start);
+	Vardec writerDec = new Vardec(writerType, $name);
+	Vardec readerDec = new Vardec(readerType, $name);
+	
+	$bundleDec::channels.add(chanDec);
+	
+	if($channel_dir.start.getText() == "->"){
+		$bundleDec::writerEnds.add(writerDec);
+		$bundleDec::readerEnds.add(readerDec);
+	}
+	else {
+		$bundleDec::writerEnds.add(readerDec);
+		$bundleDec::readerEnds.add(writerDec);
+	}
+	
 	// TODO eventually we need to handle the case where there is no enclosing bundle type
 	// (which may require a rule without the channel_dir)
 	

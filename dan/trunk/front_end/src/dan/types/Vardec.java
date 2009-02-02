@@ -5,6 +5,7 @@
  */
 
 package dan.types;
+import org.antlr.runtime.Token;
 
 /**
  * Represents a variable declaration.
@@ -12,9 +13,9 @@ package dan.types;
  */
 public class Vardec {
     public final DanType Type;
-    public final String Name;
+    public final Token Name;
     
-    public Vardec(DanType type, String name){
+    public Vardec(DanType type, Token name){
         Type = type;
         Name = name;
     }

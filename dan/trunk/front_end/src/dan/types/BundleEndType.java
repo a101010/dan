@@ -30,5 +30,5 @@ public class BundleEndType extends DanType {
     
     // TODO perhaps these need to be validated; they should be restricted
     // to channel reader and writer types
-    public ArrayList<Vardec> chanEnds = new ArrayList<Vardec>(); 
+    public ArrayList<Vardec> ChanEnds; 
 }
