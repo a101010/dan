@@ -7,6 +7,8 @@
 package dan.types;
 
 import java.util.ArrayList;
+import org.antlr.runtime.Token;
+import dan.system.NotImplementedException;
 
 // Bundles produce a plethora of types.
 // Each bundle end has a type, each channel in the bundle
@@ -35,7 +37,22 @@ import java.util.ArrayList;
 //  Channel end types
 public class BundleType extends DanType {
 
-    public ArrayList<ChannelType> channels;
-    public BundleEndType reader;
-    public BundleEndType writer;
+    public ArrayList<ChannelType> Channels;
+    public final BundleEndType Reader;
+    public final BundleEndType Writer;
+    
+    static public void ValidateName(Token token){
+        if(token.getText().contains("."))
+            throw new TypeException(token, "Bundle type name may not contain '.'");
+    }
+    
+    public BundleType(Token t, BundleEndType writer, BundleEndType reader){
+        super(t);
+        ValidateName(t);
+        Writer = writer;
+        Reader = reader;
+        if(Writer.Direction != BundleEndType.Directions.Writer
+                | Reader.Direction != BundleEndType.Directions.Reader)
+            throw new RuntimeException("inconsistent bundle end types");
+    }
 }

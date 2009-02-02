@@ -3,6 +3,9 @@ import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
 import java.io.File;
 import dan.types.*;
+import java.text.Collator;
+import java.text.RuleBasedCollator;
+import java.util.*;
 
 /**
  * 
@@ -38,5 +41,16 @@ public class DanProgTest {
         Tree t = (Tree) result.getTree();
 
         System.out.println(t.toStringTree());
+        RuleBasedCollator en_USCollator = (RuleBasedCollator)
+            Collator.getInstance(new Locale("en", "US", ""));
+
+        TreeSet<String> typeNames = new TreeSet<String>(en_USCollator);
+        typeNames.addAll(parser.types.keySet());
+        String types = "";
+        for(String typeName : typeNames){
+            types += "\n" + typeName;
+        }
+        
+        System.out.println(types + "\n");
     }
 }

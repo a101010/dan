@@ -53,7 +53,20 @@ declaration	:   decChoice -> ^(DECLARATION decChoice)
     
 decChoice 	: procDec | bundleDec;
 
-bundleDec 	: 'bundle' ID bundle_body -> ^('bundle' ID bundle_body);
+bundleDec 	: 'bundle' ID bundle_body 
+	{
+	BundleType.ValidateName($ID);
+	BundleEndType readerEnd = new BundleEndType($ID, BundleEndType.Directions.Reader);
+	BundleEndType writerEnd = new BundleEndType($ID, BundleEndType.Directions.Writer);
+	BundleType bundle = new BundleType($ID, writerEnd, readerEnd);
+	if(types.containsKey($ID)){
+		throw new TypeException($ID, "type already declared");
+	} else {
+		types.put(bundle.getName(), bundle);
+		types.put(readerEnd.getName(), readerEnd);
+		types.put(writerEnd.getName(), writerEnd);
+	}
+	} -> ^('bundle' ID bundle_body);
 
 bundle_body 	: '{' channel_dec+ '}' -> ^(BUNDLE_CHANNELS channel_dec+);
 	
@@ -62,7 +75,66 @@ bundle_body 	: '{' channel_dec+ '}' -> ^(BUNDLE_CHANNELS channel_dec+);
 // overflowing and overwriting can only be used with fixed depth channels with depth > 0, not unbounded buffers 
 // depth 0 channels are always blocking
 channel_dec 	: 'channel' proto_type=ID name=ID channel_dir STMT_END 
-			-> ^('channel' $proto_type $name channel_dir);
+	{
+	// TODO need to figure out how buffer size fits into this...
+	// can a bundle type have arbitrarily different buffer characteristics for each channel?
+	// is buffer size a constructor parameter, or part of the type?
+	// Would like bundle and channel end types to be independent of buffer characteristics,
+	// but would prefer not to have arbitrary buffering for a bundle type.
+	// Would it make sense for all elements of the bundle to have the same buffer characteristics?
+	// For single type protocols it probably makes most sense to have a constructor param for
+	// each single type channel.  More complex protocols may have buffer parameters that can be
+	// customized at runtime.  (Think of a sliding window protocol, where the receive buffer can
+	// be arbitrary, and where the ack channel may be buffered also.)
+	
+	// TODO the generic version of these types should be builtin types.
+	// For now we'll just search for the final type and add it if it isn't present yet,
+	// but reuse it if it is.
+	String readerEndName = "ChannelReader<" + $proto_type + ">";
+	String writerEndName = "ChannelWriter<" + $proto_type + ">";
+	String channelName = "SyncChannel<" + $proto_type + ">";
+	// all three should either be defined or not; it would be an error for one of them
+	// to be in the symbol table but not the others
+	ChannelReaderType readerType;
+	ChannelWriterType writerType;
+	ChannelType channelType;
+	if(types.containsKey(channelName)){
+		channelType = types.get(channelName);
+		if(types.containsKey(readerEndName)){
+			readerType = types.get(readerEndName);
+			
+		} else{
+			throw new RuntimeException("inconsistent channel type presence in types table");
+		}
+		if(types.containsKey(writerEndName)){
+			writerType = types.get(writerEndName);
+		} else {
+			throw new RuntimeException("inconsistent channel type presence in types table");
+		}
+	}
+	else {
+		// sanity check; none of them should have been defined
+		if(types.containsKey(readerEndName) || types.containsKey(writerEndName))
+			throw new RuntimeException("inconsistent channel type presence in types table");
+	
+		readerType = new ChannelReaderType($proto_type);
+		writerType = new ChannelWriterType($proto_type);
+		// TODO right now all channels are synchronous with zero depth
+		channelType = new ChannelType($proto_type);
+		
+		
+		
+		types.put(channelType.getName(), channelType);
+		types.put(readerType.getName(), readerType);
+		types.put(writerType.getName(), writerType);
+		
+	}
+	// TODO we need to add these types to the enclosing bundle types
+	// TODO eventually we need to handle the case where there is no enclosing bundle type
+	// (which may require a rule without the channel_dir)
+	
+	
+	} -> ^('channel' $proto_type $name channel_dir);
 	
 channel_dir 	: '->' | '<-';
 
