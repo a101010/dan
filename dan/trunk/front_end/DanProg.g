@@ -99,15 +99,15 @@ channel_dec 	: 'channel' proto_type=ID name=ID channel_dir STMT_END
 	ChannelWriterType writerType;
 	ChannelType channelType;
 	if(types.containsKey(channelName)){
-		channelType = types.get(channelName);
+		channelType = (ChannelType) types.get(channelName);
 		if(types.containsKey(readerEndName)){
-			readerType = types.get(readerEndName);
+			readerType = (ChannelReaderType) types.get(readerEndName);
 			
 		} else{
 			throw new RuntimeException("inconsistent channel type presence in types table");
 		}
 		if(types.containsKey(writerEndName)){
-			writerType = types.get(writerEndName);
+			writerType = (ChannelWriterType) types.get(writerEndName);
 		} else {
 			throw new RuntimeException("inconsistent channel type presence in types table");
 		}
@@ -142,8 +142,22 @@ attrib 		: '[' ID ']' -> ID;
 
 attribAdorn 	: attrib+ -> ^(ADORNMENTS attrib+);
 
-procDec 	: 'proc' ID ID '(' paramList ')' block 
-				-> ^('proc' ID ID paramList block);
+procDec 	: 'proc' ret=ID name=ID '(' paramList ')' block 
+		{
+		if(types.containsKey($name))
+			throw new TypeException($name, "proc type is already defined");
+		
+		
+		DanType returnType = types.get($ret.getText());
+		if(returnType == null){
+			// TODO add a type lookahead
+			throw new TypeException($ret, "return type is not defined");
+		}
+		
+		// TODO add the parameters
+		ProcType procType = new ProcType($name, returnType);	
+		types.put(procType.getName(), procType);	
+		} -> ^('proc' ID ID paramList block);
 
 paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;

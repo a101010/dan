@@ -7,6 +7,7 @@
 package dan.types;
 
 import java.util.ArrayList;
+import org.antlr.runtime.Token;
 
 // The user-definable parts of a proc type are
 // parameter values
@@ -24,8 +25,18 @@ import java.util.ArrayList;
 // 
 public class ProcType extends DanType {
 
+    static public void ValidateName(Token t){
+        if(t.getText().contains("."))
+            throw new TypeException(t, "Proc type names may not contain '.'");
+    }
     public ArrayList<ParamInfo> params;
     public DanType returnType;
     public ArrayList<DanType> locals;
     //public ArrayList<CallNode> callChains;  // no call chains in commstime3 example
+    
+    public ProcType(Token name, DanType returnType){
+        super(name);
+        ValidateName(name);
+        returnType = returnType;
+    }
 }
