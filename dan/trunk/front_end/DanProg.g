@@ -407,9 +407,42 @@ unary_exp	: unary_prefix_op^ atom
 unary_prefix_op : 'not' | '+' | '-';
 
  	
-atom 		: literal | ID | call | '(' exp ')' -> exp;
+atom 		: literal 
+		| ID 
+		{
+		DanType varType = getSymbolType($ID.text);
+		if(varType == null){
+			System.out.println(
+				"variable is not defined or is not in scope: "
+				+ $ID.text
+				+ " at "
+				+ $ID.line + ":" + $ID.pos);
+			++errorCount;
+		}
+		}
+		| call 
+		| '(' exp ')' -> exp;
 
-call 		: ID '(' arg_list ')' -> ^(CALL ID arg_list);
+call 		: ID '(' arg_list ')' 
+		{
+		// ID is either a proc type or a method call on a custom type
+		// TODO right now we just search proc types; add method calls
+		// (Can use getSymbolType)
+		ProcType procType = null;
+		try{
+		procType = (ProcType) types.get($ID.text);
+		if(procType == null)
+			throw new Exception("type was null");
+		}
+		catch(Exception ex){
+			System.out.println("proc type undefined: " 
+				+ $ID.text
+				+ " at "
+				+ $ID.line + ":" + $ID.pos);
+			++errorCount;
+			procType = null;
+		}
+		} -> ^(CALL ID arg_list);
 
 arg_list 	: exp?  (',' exp)* -> ^(ARGLIST exp+);
 
