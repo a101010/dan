@@ -42,7 +42,7 @@ public int errorCount = 0;
   * Get the type of the symbol; null if not defined.
   */
 DanType getSymbolType(String id){
-	String[] splitId = id.split(":");
+	String[] splitId = id.split("\\.");
 	DanType t = searchForSymbolInBlock(splitId);
 	if(t != null)
 		return t;
@@ -333,7 +333,18 @@ var_init 	: ID
 		$vardec_stmt::names.add($ID);
 		};
 
-send_stmt 	: ID '!' exp -> ^('!' ID exp);
+send_stmt 	: ID '!' exp 
+		{
+			DanType endType = getSymbolType($ID.text);
+			if(endType == null){
+				System.out.println(
+					"target of '!' is not defined or is not in scope: "
+					+ $ID.text
+					+ " at "
+					+ $ID.line + ":" + $ID.pos);
+				++errorCount;
+			}
+		} -> ^('!' ID exp);
 
 receive_stmt	: from=ID '?' target=ID -> ^('?' $from $target);
 

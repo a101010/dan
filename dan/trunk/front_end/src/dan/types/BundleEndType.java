@@ -36,7 +36,7 @@ public class BundleEndType extends DanType {
     public DanType getMemberType(String[] splitId){
         DanType member = null;
         for(Vardec v : ChanEnds){
-            if(v.Name.equals(splitId[0])){
+            if(v.Name.getText().equals(splitId[0])){
                 member = v.Type;
                 break;
             }
