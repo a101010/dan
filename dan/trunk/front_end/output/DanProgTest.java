@@ -52,5 +52,7 @@ public class DanProgTest {
         }
         
         System.out.println(types + "\n");
+        
+        System.out.println("Number of errors: " + parser.errorCount);
     }
 }

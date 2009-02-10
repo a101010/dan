@@ -29,14 +29,13 @@ public class ProcType extends DanType {
         if(t.getText().contains("."))
             throw new TypeException(t, "Proc type names may not contain '.'");
     }
-    public ArrayList<ParamInfo> params;
-    public DanType returnType;
-    public ArrayList<DanType> locals;
+    public ArrayList<Vardec> Params;
+    public DanType ReturnType;
     //public ArrayList<CallNode> callChains;  // no call chains in commstime3 example
     
     public ProcType(Token name, DanType returnType){
         super(name);
         ValidateName(name);
-        returnType = returnType;
+        ReturnType = returnType;
     }
 }

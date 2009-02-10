@@ -28,11 +28,61 @@ tokens
 {
 import java.util.HashMap;
 import dan.types.*;
+import dan.system.*;
 }
 
 @members 
 {
-	public HashMap<String, DanType> types = new HashMap<String, DanType>();
+public HashMap<String, DanType> types = new HashMap<String, DanType>();
+
+public int errorCount = 0;
+
+
+/**
+  * Get the type of the symbol; null if not defined.
+  */
+DanType getSymbolType(String id){
+	String[] splitId = id.split(":");
+	DanType t = searchForSymbolInBlock(splitId);
+	if(t != null)
+		return t;
+	t = searchForSymbolInParamList(splitId);
+	if(t != null)
+		return t;
+//	t = searchForSymbolInStaticMembers(splitId);
+	return t;
+}
+
+// TODO quite a bit of common code here; find a way to simplify
+DanType searchForSymbolInBlock(String[] splitId){
+	for(int i = $block.size() - 1; i >= 0; --i){
+		for(Vardec v : $block[i]::symbols){
+			if(v.Name.getText().equals(splitId[0])){
+				if(splitId.length == 1)
+					return v.Type;
+				return v.Type.getMemberType(splitId);
+			}
+		}
+	}
+	return null;
+}
+
+DanType searchForSymbolInParamList(String[] splitId){
+	for(Vardec v : $procDec::paramList){
+		if(v.Name.getText().equals(splitId[0])){
+			if(splitId.length == 1)
+					return v.Type;
+			return v.Type.getMemberType(splitId);
+		}
+	}
+	return null;
+}
+
+DanType searchForSymbolInStaticMembers(String id){
+	throw new NotImplementedException();
+}
+
+	
 }
 
 prog		: imports decs;
@@ -70,8 +120,8 @@ bundleDec
 	
 	{
 	BundleType.ValidateName($ID);
-	BundleEndType readerEnd = new BundleEndType($ID, BundleEndType.Directions.Reader);
-	BundleEndType writerEnd = new BundleEndType($ID, BundleEndType.Directions.Writer);
+	BundleEndType readerEnd = new BundleEndType($ID, BundleEndType.Directions.Read);
+	BundleEndType writerEnd = new BundleEndType($ID, BundleEndType.Directions.Write);
 	BundleType bundle = new BundleType($ID, writerEnd, readerEnd);
 	if(types.containsKey($ID)){
 		throw new TypeException($ID, "type already declared");
@@ -174,7 +224,15 @@ attrib 		: '[' ID ']' -> ID;
 
 attribAdorn 	: attrib+ -> ^(ADORNMENTS attrib+);
 
-procDec 	: 'proc' ret=ID name=ID '(' paramList ')' block 
+procDec 	scope
+		{
+		ArrayList<Vardec> paramList;
+		}
+		@init
+		{
+		$procDec::paramList = new ArrayList<Vardec>();
+		}
+		: 'proc' ret=ID name=ID '(' paramList ')' block 
 		{
 		if(types.containsKey($name))
 			throw new TypeException($name, "proc type is already defined");
@@ -187,7 +245,8 @@ procDec 	: 'proc' ret=ID name=ID '(' paramList ')' block
 		}
 		
 		// TODO add the parameters
-		ProcType procType = new ProcType($name, returnType);	
+		ProcType procType = new ProcType($name, returnType);
+		procType.Params = $procDec::paramList;	
 		types.put(procType.getName(), procType);	
 		} -> ^('proc' ID ID paramList block);
 
@@ -195,7 +254,15 @@ paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
 
-param 		: type=ID name=ID -> ^(PARAM $type $name);
+param 		: type=ID name=ID 
+		{
+		DanType varType = types.get($type.getText());
+		if(varType == null){
+			// TODO add a type lookahead
+			throw new TypeException($type, "type is not defined");
+		}
+		$procDec::paramList.add(new Vardec(varType, name));
+		} -> ^(PARAM $type $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
@@ -207,7 +274,21 @@ simple_statement
 			| return_stmt STMT_END -> return_stmt
 			| call STMT_END -> call;
 
-block 		: BLOCK_BEGIN statement+ BLOCK_END -> ^(BLOCK statement+);
+block 		scope
+		{
+		ArrayList<Vardec> symbols;
+		}
+		@init
+		{
+		$block::symbols = new ArrayList<Vardec>();
+		}
+		: BLOCK_BEGIN statement+ BLOCK_END 
+		{
+		System.out.println("Symbols in the current block:");
+		for(Vardec v : $block::symbols){
+			System.out.println("\t" + v.Type.getName() + " " + v.Name.getText() + "\n");
+		}
+		} -> ^(BLOCK statement+);
 
 while_stmt 	: 'while' '(' exp ')' statement
 			-> ^('while' exp statement);
@@ -222,16 +303,52 @@ par_stmt	: 'par' block -> ^('par' block);
 
 succ_stmt	: 'succ' block -> ^('succ' block);
 
-vardec_stmt 	: ID var_init (',' var_init)* -> ^(VARDEC ID var_init)+;
+vardec_stmt 	scope
+		{
+		ArrayList<Token> names;
+		}
+		@init
+		{
+		$vardec_stmt::names = new ArrayList<Token>();
+		}
+		: ID var_init (',' var_init)* 
+		{
+		DanType varType = types.get($ID.getText());
+		if(varType == null){
+			// TODO add a type lookahead
+			throw new TypeException($ID, "type is not defined");
+		}
+		ArrayList<Vardec> symbols = $block::symbols;
+		for(Token name : $vardec_stmt::names){
+			symbols.add(new Vardec(varType, name));
+		}
+		} -> ^(VARDEC ID var_init)+;
 
-var_init 	: ID -> ID
-		 | ID '='^ exp;
+var_init 	: ID 
+		{
+		$vardec_stmt::names.add($ID);
+		} -> ID
+		| ID '='^ exp
+		{
+		$vardec_stmt::names.add($ID);
+		};
 
 send_stmt 	: ID '!' exp -> ^('!' ID exp);
 
 receive_stmt	: from=ID '?' target=ID -> ^('?' $from $target);
 
-assign_stmt 	: ID '='^ exp;
+assign_stmt 	: ID '='^ exp
+		{
+			DanType targetType = getSymbolType($ID.text);
+			if(targetType == null){
+				System.out.println(
+					"target of assignment is not defined or is not in scope: "
+					+ $ID.text
+					+ " at "
+					+ $ID.line + ":" + $ID.pos);
+				++errorCount;
+			}
+		};
 
 return_stmt	: 'return' exp -> ^('return' exp);
 

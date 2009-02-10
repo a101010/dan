@@ -14,7 +14,7 @@ import java.util.ArrayList;
  * @author Alan
  */
 public class BundleEndType extends DanType {
-    public enum Directions { Reader, Writer }
+    public enum Directions { Read, Write }
     
     public BundleEndType(Token t, Directions d){
         super(t);
@@ -31,4 +31,17 @@ public class BundleEndType extends DanType {
     // TODO perhaps these need to be validated; they should be restricted
     // to channel reader and writer types
     public ArrayList<Vardec> ChanEnds; 
+    
+    @Override
+    public DanType getMemberType(String[] splitId){
+        DanType member = null;
+        for(Vardec v : ChanEnds){
+            if(v.Name.equals(splitId[0])){
+                member = v.Type;
+                break;
+            }
+        }
+        
+        return getRightmostType(splitId, member);
+    }
 }

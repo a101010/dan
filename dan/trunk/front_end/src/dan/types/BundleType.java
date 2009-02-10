@@ -49,10 +49,26 @@ public class BundleType extends DanType {
     public BundleType(Token t, BundleEndType writer, BundleEndType reader){
         super(t);
         ValidateName(t);
+        // TODO consider making this Read and Write rather than Reader and Writer
         Writer = writer;
         Reader = reader;
-        if(Writer.Direction != BundleEndType.Directions.Writer
-                | Reader.Direction != BundleEndType.Directions.Reader)
+        if(Writer.Direction != BundleEndType.Directions.Write
+                | Reader.Direction != BundleEndType.Directions.Read)
             throw new RuntimeException("inconsistent bundle end types");
     }
+    
+    @Override
+    public DanType getMemberType(String[] splitId){
+        BundleEndType member = null;
+        if(splitId[0].equals("Read")){
+            
+            member = Reader;
+        }
+        else if(splitId[0].equals("Write")){
+            member = Writer;
+        }
+        
+        return getRightmostType(splitId, member);
+    }
+    
 }
