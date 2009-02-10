@@ -60,7 +60,7 @@ DanType searchForSymbolInBlock(String[] splitId){
 			if(v.Name.getText().equals(splitId[0])){
 				if(splitId.length == 1)
 					return v.Type;
-				return v.Type.getMemberType(splitId);
+				return v.Type.getMemberType(ArrayUtils.tail(splitId));
 			}
 		}
 	}
@@ -72,7 +72,7 @@ DanType searchForSymbolInParamList(String[] splitId){
 		if(v.Name.getText().equals(splitId[0])){
 			if(splitId.length == 1)
 					return v.Type;
-			return v.Type.getMemberType(splitId);
+			return v.Type.getMemberType(ArrayUtils.tail(splitId));
 		}
 	}
 	return null;
@@ -335,30 +335,50 @@ var_init 	: ID
 
 send_stmt 	: ID '!' exp 
 		{
-			DanType endType = getSymbolType($ID.text);
-			if(endType == null){
-				System.out.println(
-					"target of '!' is not defined or is not in scope: "
-					+ $ID.text
-					+ " at "
-					+ $ID.line + ":" + $ID.pos);
-				++errorCount;
-			}
+		DanType endType = getSymbolType($ID.text);
+		if(endType == null){
+			System.out.println(
+				"target of '!' is not defined or is not in scope: "
+				+ $ID.text
+				+ " at "
+				+ $ID.line + ":" + $ID.pos);
+			++errorCount;
+		}
 		} -> ^('!' ID exp);
 
-receive_stmt	: from=ID '?' target=ID -> ^('?' $from $target);
+receive_stmt	: from=ID '?' target=ID 
+		{
+		DanType endType = getSymbolType($from.text);
+		if(endType == null){
+			System.out.println(
+				"source channel end of '?' is not defined or is not in scope: "
+				+ $from.text
+				+ " at "
+				+ $from.line + ":" + $from.pos);
+			++errorCount;
+		}
+		DanType targetType = getSymbolType($target.text);
+		if(targetType == null){
+			System.out.println(
+				"target of '?' is not defined or is not in scope: "
+				+ $target.text
+				+ " at "
+				+ $target.line + ":" + $target.pos);
+			++errorCount;
+		}
+		} -> ^('?' $from $target);
 
 assign_stmt 	: ID '='^ exp
 		{
-			DanType targetType = getSymbolType($ID.text);
-			if(targetType == null){
-				System.out.println(
-					"target of assignment is not defined or is not in scope: "
-					+ $ID.text
-					+ " at "
-					+ $ID.line + ":" + $ID.pos);
-				++errorCount;
-			}
+		DanType targetType = getSymbolType($ID.text);
+		if(targetType == null){
+			System.out.println(
+				"target of assignment is not defined or is not in scope: "
+				+ $ID.text
+				+ " at "
+				+ $ID.line + ":" + $ID.pos);
+			++errorCount;
+		}
 		};
 
 return_stmt	: 'return' exp -> ^('return' exp);
