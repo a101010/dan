@@ -20,7 +20,7 @@ proc void Delta(BInt.Read in, BInt.Write out1, BInt.Write out2)
 	while (true)
 	{		
 		in.c ? value;
-		out.c ! value;
+		out1.c ! value;
 		out2.c ! value;
 	}
 }
