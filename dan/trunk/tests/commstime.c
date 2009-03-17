@@ -96,7 +96,7 @@ void proc_ctor(proc * p, char * proc_name, proc * parent, void * locals, OpProcB
 typedef void (*OpPoison)(void * chans);
 typedef int (*OpIsPoisoned)(void * chans); 
 
-
+// TODO need seperate read/write end structures for each channel in the bundle
 // TODO bundle ends should be mobile by default, but have to develop the idea of a moble reference type in more detail first
 typedef struct bundle_end_tag
 {
@@ -136,7 +136,8 @@ BInt_chans * BInt_chans_ctor(BInt_chans * chans)
 	chans->is_poisoned = 0;
 	chans->c_valid_value = 0;
 	chans->c_valid_value = 0;
-	chans->reader_waiting = 0;
+	// TODO need reader waiting and writer waiting for each channel
+	chans->reader_waiting = 0; 
 	chans->writer_waiting = 0;
 	return chans;
 }
@@ -248,6 +249,9 @@ int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, sche
 
 // the need for an implementation of Poison and IsPoisoned for each bundle type
 // can probably be simplified by another layer of indirection, but is it worth it?
+
+// TODO the poison operation must check each reader_waiting and writer_waiting for all channels
+// TODO need to get locks for poison operations
 
 void Poison_BInt_writer(void * chans, scheduler * s)
 {

@@ -1,0 +1,297 @@
+group SingleThread;
+
+danModule(frontMatter, imports, decs) ::= <<
+// C file generated from Danger source code by the dan compiler
+<frontMatter>
+
+// ---------------------------------------
+// I m p o r t s
+// ---------------------------------------
+<imports>
+
+// ---------------------------------------
+// D e c l a r a t i o n s
+// ---------------------------------------
+
+<decs>
+>>
+
+importStmt(library, symbol) ::= <<
+// import: library= <library> symbol= <symbol>
+
+>>
+
+attrib(attribId) ::= <<
+// [<attribId>]
+
+>>
+
+adornedDec(attribs, dec) ::= <<
+
+// -------------------------------------
+// Adorned declaration
+// -------------------------------------
+// Attribute section:
+<attribs>
+<dec>
+
+>>
+
+simpleBundleDec(bundleType, 
+                channelDecs, 
+                wakeWaiting, 
+                channelCtors,
+                channelOps) ::= <<
+// ----------------------------------------------
+// <bundleType> channel bundle type
+
+// channel backing store for <bundleType> channel bundle
+typedef struct <bundleType>_chans_tag
+{
+	int is_poisoned; // 0 = false, 1 = true
+	<channelDecs>
+	
+} <bundleType>_chans;
+
+// bundle poison ops
+
+void Poison_<bundleType>(void * chans, scheduler * s)
+{
+  <bundleType>_chans* rchans = (<bundleType>_chans*)chans;
+	rchans->is_poisoned = 1;
+	<wakeWaiting>
+}
+
+int IsPoisoned_<bundleType>(void * chans)
+{
+	return ((<bundleType>_chans*)chans)->is_poisoned;
+}
+
+bundle_end * <bundleType>_bundleEnd_ctor(bundleEnd * bEnd, <bundleType>_chans * chans)
+{
+  bEnd->chans = chans;
+  bEnd->isPoisoned = IsPoisoned_<bundleType>;
+  bEnd->poison = Poison_<bundleType>;
+  return bEnd;
+}
+
+// <bundleType>_chans constructor
+<bundleType>_chans * <bundleType>_chans_ctor(<bundleType>_chans * chans)
+{
+  chans->is_poisoned = 0;
+  <channelCtors>
+  return chans;
+}
+
+// Channel ops for bundle type <bundleType>
+
+<channelOps>
+
+// End of <bundleType> bundle type
+
+
+>>
+
+
+simpleChanWakeupReader(chanName) ::= <<
+if( 0 != rchans-><chanName>_reader_waiting)
+{
+  s->schedule(s, rchans-><chanName>_reader_waiting);
+  rchans-><chanName>_reader_waiting = 0;
+}
+
+>>
+
+simpleChanWakeupWriter(chanName) ::= <<
+if( 0 != rchans-><chanName>_writer_waiting)
+{
+  s->schedule(s, rchans-><chanName>_writer_waiting);
+  rchans-><chanName>_writer_waiting = 0;
+}
+
+>>
+
+
+simpleChanDec(chanType, chanName) ::= <<
+// backing store for channel <chanName>
+<chanType> <chanName>_value;
+unsigned int <chanName>_valid_value; // 0 if invalid
+proc * <chanName>_reader_waiting; // reader waiting to synchronize on the channel
+proc * <chanName>_writer_waiting; // writer waiting to synchronize on the channel
+
+>>
+
+simpleChanCtor(chanName, defaultValue) ::= <<
+
+chans-><chanName>_value = <defaultValue>;
+chans-><chanName>_valid_value = 0;
+chans-><chanName>_reader_waiting = 0;
+chans-><chanName>_writer_waiting = 0;
+
+>>
+
+simpleChanOps(chanName, chanType, bundleType, wakeupWriter) ::= <<
+
+// Channel ops for channel <chanName> in <bundleType>
+
+// Read op
+// returns 0 if it wrote the value and synchronized; 
+// 1 if it blocked; and 2 if an exception was thrown
+int ChanRead_<bundleType>_<chanName>_0(<bundleType>_chans * chans, 
+                                       <chanType> * value, 
+                                       char ** exception, 
+                                       proc * p, 
+                                       scheduler * s)
+{
+	int ret_val = 2;
+	// TODO get the lock
+	if(chans->is_poisoned)
+	{
+		*exception = "channel poison";
+	}
+	else
+	{
+		if(chans-><chanName>_valid_value)
+		{
+			*value = chans-><chanName>_value;
+			chans-><chanName>_valid_value = 0;
+			<wakeupWriter>
+			ret_val = 0;
+		}
+		else
+		{
+			chans-><chanName>_reader_waiting = p;
+			ret_val = 1;
+		}
+	}
+
+	// TODO release the lock
+	return ret_val;
+}
+
+// returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
+int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc * p, scheduler * s)
+{
+	int ret_val = 2;
+	// TODO get the lock
+	if(chans->is_poisoned)
+	{
+		// TODO make exceptions something other than just plain strings (& null terminated at that!)
+		*exception = (void*) "channel poison";
+	}
+	else
+	{
+		// TODO right now the writer allways unconditionally writes; allow to withdraw if in ALT
+		chans->c_value = value;
+		chans->c_valid_value = 1;
+		if(chans->reader_waiting != 0)
+		{
+			s->schedule(s, chans->reader_waiting);
+			chans->reader_waiting = 0;
+			ret_val = 0;
+		}
+		else
+		{
+			chans->writer_waiting = p;
+			ret_val = 1;
+		}
+		
+	}
+
+	// TODO release the lock
+	return ret_val;
+}
+
+// In this case the value has already been written, we're just checking to make sure it has been read
+int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, scheduler * s)
+{
+	int ret_val = 2;
+	// TODO get the lock
+	if(chans->is_poisoned)
+	{
+		// TODO make exceptions something other than just plain strings (& null terminated at that!)
+		*exception = (void*) "channel poison";
+	}
+	else
+	{
+		if(chans->reader_waiting != 0)
+		{
+			s->schedule(s, chans->reader_waiting);
+			chans->reader_waiting = 0;
+			ret_val = 0;
+		}
+		else
+		{
+			if(chans->c_valid_value == 0)
+			{
+				ret_val = 0;
+			}
+			else
+			{
+				chans->writer_waiting = p;
+				ret_val = 1;
+			}
+		}
+	}
+
+	// TODO release the lock
+	return ret_val;
+}
+
+>>
+
+procDec(procType,
+        procDefines,
+        locals,
+        params,
+        initLocals,
+        stateLabels,
+        poisonEnds) ::= <<
+// ----------------------------------------------
+// <procType> PROC type
+<procDefines>
+typedef struct <procType>_locals_tag
+{
+	<locals>
+	bundle_end * __ends__[NUM_<procType>_BUNDLE_ENDS]; 
+} <procType>_locals;
+
+// <procType>_locals constructor
+<procType>_locals * <procType>_locals_ctor(<procType>_locals * locals,
+    <params>)
+{
+  <initLocals>
+}
+
+void <procType>_body(proc * p, scheduler * s)
+{
+	int result;
+	int blocked = 0;
+
+	<procType>_locals * locals = (<procType>_locals*) p->locals;
+
+	while(!blocked)
+	{
+		switch(p->state)
+		{
+		<stateLabels>
+		default:
+			printf("Unsupported process state in <procType>_body: %d\n", p->state);
+			p->exception = "Unsupported process state in <procType>_body\n";
+			p->state = _PS_EXCEPTION_;
+			blocked = 1;
+		}
+	}
+
+	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
+	{
+		<poisonEnds>
+	}
+}
+
+
+
+// End of <procType> PROC type
+
+
+>>

@@ -383,9 +383,11 @@ assign_stmt 	: ID '='^ exp
 
 return_stmt	: 'return' exp -> ^('return' exp);
 
-exp	 	: exp1 -> ^(EXP exp1);
+//exp	 	: exp1 -> ^(EXP exp1);
 
-exp1		: bool_exp (comp_op^ bool_exp)*;
+//exp1		: bool_exp (comp_op^ bool_exp)*;
+
+exp		: bool_exp (comp_op^ bool_exp)*;
  	
 comp_op 	: '<' | '>' | '<=' | '>=' | '==' | '!=';
 

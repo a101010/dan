@@ -1,6 +1,8 @@
 
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
+import org.antlr.stringtemplate.*;
+import java.io.*;
 import java.io.File;
 import dan.types.*;
 import java.text.Collator;
@@ -36,6 +38,7 @@ public class DanProgTest {
             parser.types.put(b.name().toLowerCase(), bType);
         }
 
+        // Parse input and build AST
         DanProgParser.prog_return result = parser.prog();
 
         Tree t = (Tree) result.getTree();
@@ -54,5 +57,21 @@ public class DanProgTest {
         System.out.println(types + "\n");
         
         System.out.println("Number of errors: " + parser.errorCount);
+
+        // load the template group file
+        FileReader groupFileR = new FileReader("SingleThread.stg");
+        StringTemplateGroup templates = new StringTemplateGroup(groupFileR);
+        groupFileR.close();
+
+        // Walk the AST
+        // Create stream of tree nodes from the tree
+        CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
+        DanGen walker = new DanGen(nodes);
+        walker.setTemplateLib(templates);
+        DanGen.prog_return r2 = walker.prog();
+
+        // Emit module
+        StringTemplate output = (StringTemplate)r2.getTemplate();
+        System.out.println(output.toString());
     }
 }

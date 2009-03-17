@@ -23,34 +23,114 @@ import dan.system.*;
 	
 }
 
-prog		: imports decs;
+prog		: imports decs -> danModule(frontMatter={"// TODO frontmatter"},
+					    imports={$imports.st}, 
+					    decs={$decs.st});
 
 
-imports 	: ^(IMPORTS importStmt*);
+imports 	: ^(IMPORTS (imp+=importStmt)*) -> template(imports={$imp}) "<imports>";
     
-importStmt 	: ^('import' library=ID symbol=ID)
-		| ^('import' library=ID ALL);
+importStmt 	: ^('import' library=ID symbol=ID) 
+			-> importStmt(library={$library.text}, symbol={$symbol.text})
+		| ^('import' library=ID ALL)
+			-> importStmt(library={$library.text}, symbol={$ALL.text});
 		
-decs 		: declaration+;
-                
-declaration	: ^(DECLARATION decChoice) 
-		| ^(DECLARATION attribAdorn decChoice);
+decs 		: (d+=declaration)+ -> template(decs={$d}) "<decs>";
+   
+declaration	: ^(DECLARATION decChoice) -> template(dec={$decChoice.st}) "<dec>"
+		| ^(DECLARATION attribAdorn decChoice) -> adornedDec(attribs={$attribAdorn.st},
+								     dec={$decChoice.st});
     
-decChoice 	: procDec | bundleDec;
+decChoice 	: procDec -> template(dec={$procDec.st}) "<dec>"
+		| bundleDec -> template(dec={$bundleDec.st}) "<dec>";
 
-bundleDec 	: ^('bundle' ID bundle_body);
+bundleDec 	scope
+		{
+			ArrayList<StringTemplate> channelDecs;
+			ArrayList<StringTemplate> wakeWaiting;
+			ArrayList<StringTemplate> channelCtors;
+			ArrayList<StringTemplate> channelOps;
+			String bundleType;
+		}
+		@init
+		{
+			$bundleDec::channelDecs = new ArrayList<StringTemplate>();
+			$bundleDec::wakeWaiting = new ArrayList<StringTemplate>();
+			$bundleDec::channelCtors = new ArrayList<StringTemplate>();
+			$bundleDec::channelOps = new ArrayList<StringTemplate>();
+		}
+		: ^('bundle' ID { $bundleDec::bundleType = $ID.text; }
+		bundle_body) -> simpleBundleDec(bundleType={$ID.text},
+								channelDecs={$bundleDec::channelDecs},
+								wakeWaiting={$bundleDec::wakeWaiting},
+								channelCtors={$bundleDec::channelCtors},
+								channelOps={$bundleDec::channelOps} );
 
 bundle_body 	: ^(BUNDLE_CHANNELS channel_dec+);
 	
-channel_dec 	:  ^('channel' proto_type=ID name=ID channel_dir);
+channel_dec 	:  ^('channel' proto_type=ID name=ID channel_dir)
+		{
+			STAttrMap channelDecMap = new STAttrMap();
+			// TODO can't directly use the proto_type.text; need a map function
+			channelDecMap.put("chanType", $proto_type.text);
+			channelDecMap.put("chanName", $name.text);
+		
+			StringTemplate channelDec 
+				= templateLib.getInstanceOf("simpleChanDec", channelDecMap);
+			$bundleDec::channelDecs.add(channelDec);
+			
+			STAttrMap wakeWaitingMap = new STAttrMap();
+			wakeWaitingMap.put("chanName", $name.text);
+			
+			StringTemplate wakeReader
+				= templateLib.getInstanceOf("simpleChanWakeupReader", wakeWaitingMap);
+			
+			$bundleDec::wakeWaiting.add(wakeReader);
+				
+			StringTemplate wakeWriter
+				= templateLib.getInstanceOf("simpleChanWakeupWriter", wakeWaitingMap);
+				
+			$bundleDec::wakeWaiting.add(wakeWriter);
+			
+			STAttrMap chanCtorMap = new STAttrMap();
+			chanCtorMap.put("chanName", $name.text);
+			
+			// TODO need a way to lookup default values by type
+			// TODO for ref types will have to call a constructor
+			chanCtorMap.put("defaultValue", "0");
+			
+			StringTemplate chanCtor
+				= templateLib.getInstanceOf("simpleChanCtor", chanCtorMap);
+				
+			$bundleDec::channelCtors.add(chanCtor);
+			
+			STAttrMap chanOpsMap = new STAttrMap();
+			chanOpsMap.put("chanName", $name.text);
+			chanOpsMap.put("chanType", $proto_type.text);
+			chanOpsMap.put("bundleType", $bundleDec::bundleType);
+			chanOpsMap.put("wakeupWriter", wakeWriter);
+			
+			StringTemplate chanOps
+				= templateLib.getInstanceOf("simpleChanOps", chanOpsMap);
+				
+			$bundleDec::channelOps.add(chanOps);
+							    
+		};
 	
 channel_dir 	: '->' | '<-';
 
-attrib 		: ID;
+attrib 		: ID -> attrib(attribId={$ID.text});
 
-attribAdorn 	: ^(ADORNMENTS attrib+);
+attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) -> template(attribs={$a}) "<attribs>";
 
-procDec 	: ^('proc' returnType=ID name=ID paramList block);
+procDec 	: ^('proc' returnType=ID name=ID paramList block) 
+			-> procDec(procType={$name.text},
+				   procDefines={"// TODO procDefines"},
+				   locals={"// TODO locals"},
+				   params={"// TODO params"},
+				   initLocals={"// TODO initLocals"},
+				   stateLables={"// TODO stateLabels"},
+				   poisonEnds={"// TODO poisonEnds"});
 
 paramList 	: ^(PARAMLIST param*);
 
