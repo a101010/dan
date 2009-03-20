@@ -216,7 +216,7 @@ succ_stmt	: ^('succ' block);
 
 vardec_stmt 	: ^(VARDEC ID var_init)
 		{
-			DanType varType = types.get($type.text);	
+			/*DanType varType = types.get($type.text);	
 			STAttrMap typeNameMap = new STAttrMap();
 			typeNameMap.put("type", varType.getEmittedType());
 			typeNameMap.put("name", $name.text);
@@ -251,6 +251,7 @@ vardec_stmt 	: ^(VARDEC ID var_init)
 				= templateLib.getInstanceOf(types.get( $type.text).getCleanupTemplateName(),
 							    typeNameMap);
 			$procDec::cleanup.add(cleanup);
+			*/
 		};
 
 var_init 	: ID 
