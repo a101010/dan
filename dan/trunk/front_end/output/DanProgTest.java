@@ -67,6 +67,7 @@ public class DanProgTest {
         // Create stream of tree nodes from the tree
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
         DanGen walker = new DanGen(nodes);
+        walker.types = parser.types;
         walker.setTemplateLib(templates);
         DanGen.prog_return r2 = walker.prog();
 

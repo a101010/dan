@@ -62,5 +62,17 @@ public class DanType {
     public DanType getMemberType(String [] splitId){
         return null;
     }
+
+    public String getEmittedType(){
+        return getName();
+    }
+
+    public String getCleanupTemplateName(){
+        return "defaultCleanup";
+    }
+
+    public boolean isByRef(){
+        return true;
+    }
     
 }

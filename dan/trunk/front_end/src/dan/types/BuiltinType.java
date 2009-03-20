@@ -61,4 +61,11 @@ public class BuiltinType extends DanType {
         return type.toString().toLowerCase();
     }
 
+    // TODO some builtins will be byRef (e.g. strings)
+    // will also have to override getEmittedType and getCleanupTemplate
+    @Override
+    public boolean isByRef(){
+        return false;
+    }
+
 }

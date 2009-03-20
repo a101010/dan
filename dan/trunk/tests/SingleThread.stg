@@ -246,19 +246,18 @@ procDec(procType,
         params,
         initLocals,
         stateLabels,
-        poisonEnds) ::= <<
+        cleanup) ::= <<
 // ----------------------------------------------
 // <procType> PROC type
 <procDefines>
 typedef struct <procType>_locals_tag
 {
 	<locals>
-	bundle_end * __ends__[NUM_<procType>_BUNDLE_ENDS]; 
 } <procType>_locals;
 
 // <procType>_locals constructor
 <procType>_locals * <procType>_locals_ctor(<procType>_locals * locals,
-    <params>)
+    <params; separator=", ">)
 {
   <initLocals>
 }
@@ -285,7 +284,7 @@ void <procType>_body(proc * p, scheduler * s)
 
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
-		<poisonEnds>
+		<cleanup>
 	}
 }
 
@@ -295,3 +294,39 @@ void <procType>_body(proc * p, scheduler * s)
 
 
 >>
+
+defaultCleanup(type, name) ::= <<
+// don't need to cleanup <name> of type <type>
+
+>>
+
+bundleEndCleanup(type, name) ::= <<
+locals-><name>->poison(locals-><name>->chans, s);
+
+>>
+
+bundleCleanup(type, name) ::= <<
+Poison_<type>(&<name>, s);
+
+>>
+
+localValueDec(type, name) ::= <<
+<type> <name>;
+
+>>
+
+localByRefDec(type, name) ::= <<
+<type> * <name>;
+
+>>
+
+initLocal(name, value) ::= <<
+locals-><name> = <value>; 
+
+>>
+
+
+
+valueParam(type, name) ::= "<type> <name>"
+
+refParam(type, name) ::= "<type> * <name>"

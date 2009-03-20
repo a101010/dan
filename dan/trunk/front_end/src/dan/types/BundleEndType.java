@@ -44,4 +44,14 @@ public class BundleEndType extends DanType {
         
         return getRightmostType(splitId, member);
     }
+
+    @Override
+    public String getEmittedType(){
+        return "bundle_end";
+    }
+
+    @Override
+    public String getCleanupTemplateName(){
+        return "bundleEndCleanup";
+    }
 }

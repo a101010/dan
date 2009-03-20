@@ -19,7 +19,7 @@ import dan.system.*;
 
 @members 
 {
-
+public HashMap<String, DanType> types;
 	
 }
 
@@ -123,18 +123,74 @@ attrib 		: ID -> attrib(attribId={$ID.text});
 
 attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) -> template(attribs={$a}) "<attribs>";
 
-procDec 	: ^('proc' returnType=ID name=ID paramList block) 
+procDec 	scope
+		{
+			ArrayList<StringTemplate> procDefines;
+			ArrayList<StringTemplate> locals;
+			ArrayList<StringTemplate> params;
+			ArrayList<StringTemplate> initLocals;
+			ArrayList<StringTemplate> stateLabels;
+			ArrayList<StringTemplate> cleanup;
+			
+		}
+		@init
+		{
+			$procDec::procDefines = new ArrayList<StringTemplate>();
+			$procDec::locals = new ArrayList<StringTemplate>();
+			$procDec::params = new ArrayList<StringTemplate>();
+			$procDec::initLocals = new ArrayList<StringTemplate>();
+			$procDec::stateLabels = new ArrayList<StringTemplate>();
+			// TODO at the moment cleanup is only at the end of a proc
+			// and always occurs
+			// Need to allow ref types that are passed as messages or 
+			// one-way parameters to skip cleanup
+			// Would be nice if cleanup occurs on last use, rather than 
+			// at the end of the proc
+			$procDec::cleanup = new ArrayList<StringTemplate>();
+		}
+		: ^('proc' returnType=ID name=ID paramList block) 
 			-> procDec(procType={$name.text},
 				   procDefines={"// TODO procDefines"},
-				   locals={"// TODO locals"},
-				   params={"// TODO params"},
-				   initLocals={"// TODO initLocals"},
+				   locals={$procDec::locals},
+				   params={$procDec::params},
+				   initLocals={$procDec::initLocals},
 				   stateLables={"// TODO stateLabels"},
-				   poisonEnds={"// TODO poisonEnds"});
+				   cleanup={$procDec::cleanup});
 
 paramList 	: ^(PARAMLIST param*);
 
-param 		: ^(PARAM type=ID name=ID);
+param 		: ^(PARAM type=ID name=ID)
+		{	
+			DanType paramType = types.get($type.text);	
+			STAttrMap typeNameMap = new STAttrMap();
+			typeNameMap.put("type", paramType.getEmittedType());
+			typeNameMap.put("name", $name.text);
+			
+			StringTemplate local = null;
+			StringTemplate param = null;
+			if (paramType.isByRef()) {
+				local = templateLib.getInstanceOf("localByRefDec", typeNameMap);
+				param = templateLib.getInstanceOf("refParam", typeNameMap);
+			}
+			else {
+				local = templateLib.getInstanceOf("localValueDec", typeNameMap);
+				param = templateLib.getInstanceOf("valueParam", typeNameMap);
+			}
+			$procDec::locals.add(local);
+			$procDec::params.add(param);
+			
+			STAttrMap initLocalsMap = new STAttrMap();
+			initLocalsMap.put("name", $name.text);
+			initLocalsMap.put("value", $name.text);
+			StringTemplate initLocals
+				= templateLib.getInstanceOf("initLocal", initLocalsMap);
+			$procDec::initLocals.add(initLocals);	
+			
+			StringTemplate cleanup 
+				= templateLib.getInstanceOf(types.get( $type.text).getCleanupTemplateName(),
+							    typeNameMap);
+			$procDec::cleanup.add(cleanup);
+		};
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
@@ -158,7 +214,44 @@ par_stmt	: ^('par' block);
 
 succ_stmt	: ^('succ' block);
 
-vardec_stmt 	: ^(VARDEC ID var_init);
+vardec_stmt 	: ^(VARDEC ID var_init)
+		{
+			DanType varType = types.get($type.text);	
+			STAttrMap typeNameMap = new STAttrMap();
+			typeNameMap.put("type", varType.getEmittedType());
+			typeNameMap.put("name", $name.text);
+			
+			StringTemplate local = null;
+			// TODO when we can allocate with new we'll need this again.
+			// Although it would be nice to be able to allocate locally
+			// if something need not be mobile because it is never communicated.
+			//if (varType.isByRef()) {
+			//	local = templateLib.getInstanceOf("localByRefDec", typeNameMap);
+			//}
+			//else {
+				local = templateLib.getInstanceOf("localValueDec", typeNameMap);
+			//}
+			$procDec::locals.add(local);
+			
+			STAttrMap initLocalsMap = new STAttrMap();
+			StringTemplate initLocal;
+			if (varType.isByRef()) {
+				initLocal = templateLib.getInstanceOf("constructLocal", initLocalsMap);
+			}
+			else {
+				// TODO need to deal with var_init
+				initLocalsMap.put("name", $name.text);
+				initLocalsMap.put("value", "0");
+				initLocal = templateLib.getInstanceOf("initLocal", initLocalsMap);
+			}
+			
+			$procDec::initLocals.add(initLocal);	
+			
+			StringTemplate cleanup 
+				= templateLib.getInstanceOf(types.get( $type.text).getCleanupTemplateName(),
+							    typeNameMap);
+			$procDec::cleanup.add(cleanup);
+		};
 
 var_init 	: ID 
 		| ^('=' ID exp);
