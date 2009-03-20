@@ -1,11 +1,10 @@
-extern struct proc_tag;
-typedef struct proc_tag proc;
+struct proc_tag;
 
 // doubly linked list of procs
 typedef struct proc_node_tag 
 {
 	struct proc_node_tag * up, * down;
-	struct proc * p;
+	struct proc_tag * p;
 } proc_node;
 
 // push n to the front of the list, n becomes (*head)

@@ -17,10 +17,9 @@
 typedef int int32;
 typedef unsigned int uint;
 
-extern struct scheduler_tag;
-typedef struct scheduler_tag scheduler;
+struct scheduler_tag;
 
-typedef void (*OpSchedule)(scheduler * ctxt, proc * p);
+typedef int (*OpSchedule)(struct scheduler_tag * ctxt, struct proc_tag * p);
 
 typedef void * sched_context;
 
@@ -33,7 +32,7 @@ typedef struct scheduler_tag
 	OpSchedule schedule;
 } scheduler;
 
-typedef void (*OpProcBody)(proc * p, scheduler * s);
+typedef void (*OpProcBody)(struct proc_tag * p, scheduler * s);
 
 // some predefined special values for proc.state
 #define _PS_EXCEPTION_ 0
@@ -69,7 +68,7 @@ typedef struct proc_tag
 {
 	// TODO what can we do to shrink this?
 	char * proc_name; // this may ultimately evolve into a pointer to a proc type structure (similar to a type class in Java or .NET) For now we need it for exeptions and debugging
-	proc * parent; // we need it so we can schedule our parent when we exit
+	struct proc_tag * parent; // we need it so we can schedule our parent when we exit
 	void * locals;
 	uint state; // corresponds to the instruction pointer
 	char * exception; // TODO eventually we need an exception structure
@@ -93,7 +92,7 @@ void proc_ctor(proc * p, char * proc_name, proc * parent, void * locals, OpProcB
 }
 
 
-typedef void (*OpPoison)(void * chans);
+typedef void (*OpPoison)(void * chans, scheduler * s);
 typedef int (*OpIsPoisoned)(void * chans); 
 
 // TODO need seperate read/write end structures for each channel in the bundle
@@ -330,7 +329,7 @@ typedef struct Delta_locals_tag
 } Delta_locals;
 
 
-proc * Delta_body(proc * p, scheduler * s)
+void Delta_body(proc * p, scheduler * s)
 {
 	int result;
 	Delta_locals* locals = (Delta_locals*) p->locals;
@@ -363,7 +362,7 @@ proc * Delta_body(proc * p, scheduler * s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 1:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, locals->value, &p->exception, p, s);
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, locals->value, (void**) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -386,7 +385,7 @@ proc * Delta_body(proc * p, scheduler * s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 2:
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, &p->exception, p, s);
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -408,7 +407,7 @@ proc * Delta_body(proc * p, scheduler * s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 3:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, locals->value, &p->exception, p, s);
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, locals->value, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -431,7 +430,7 @@ proc * Delta_body(proc * p, scheduler * s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 4:
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, &p->exception, p, s);
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -474,6 +473,7 @@ Delta_locals * Delta_locals_ctor(Delta_locals * locals, bundle_end* in, bundle_e
 	locals->__ends__[BUNDLE_END_Delta_in] = in;
 	locals->__ends__[BUNDLE_END_Delta_out1] = out1;
 	locals->__ends__[BUNDLE_END_Delta_out2] = out2;
+	return locals;
 }
 
 #define NUM_Succ_BUNDLE_ENDS 2
@@ -487,7 +487,7 @@ typedef struct Succ_locals_tag
 
 
 
-proc * Succ_body(proc * p, scheduler *s)
+void Succ_body(proc * p, scheduler *s)
 {
 	int result;
 	Succ_locals* locals = (Succ_locals*) p->locals;
@@ -521,7 +521,7 @@ proc * Succ_body(proc * p, scheduler *s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 1:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, locals->value, &p->exception, p, s);
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, locals->value, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -544,7 +544,7 @@ proc * Succ_body(proc * p, scheduler *s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 2:
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, &p->exception, p, s);
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -587,6 +587,7 @@ Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end* in, bundle_end*
 {
 	locals->__ends__[BUNDLE_END_Succ_in] = in;
 	locals->__ends__[BUNDLE_END_Succ_out] = out;
+	return locals;
 }
 
 
@@ -605,6 +606,7 @@ Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bund
 	locals->__ends__[BUNDLE_END_Prefix_in] = in;
 	locals->__ends__[BUNDLE_END_Prefix_out] = out;
 	locals->value = initValue;
+	return locals;
 }
 
 
@@ -623,7 +625,7 @@ void Prefix_body(proc * p, scheduler * s)
 			printf("Prefix init value: %d\n", locals->value); 
 			// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
 			//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &(p->exception), p, s); 
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &(p->exception), p, s); 
 			switch(result)
 			{
 			case 0: // wrote value and synced
@@ -648,7 +650,7 @@ void Prefix_body(proc * p, scheduler * s)
 		case _PS_READY_TO_RUN_ + 1:
 			// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
 			//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, &(p->exception), p, s); 
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, (void **) &(p->exception), p, s); 
 			switch(result)
 			{
 			case 0: // wrote value and synced
@@ -694,7 +696,7 @@ void Prefix_body(proc * p, scheduler * s)
 			}
 			break;
 		case _PS_READY_TO_RUN_ + 3:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, &p->exception, p, s);
+			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -897,7 +899,7 @@ typedef struct Commstime_locals_tag
 
 } Commstime_locals;
 
-Commstime_locals * Commstime_locals_ctor(Commstime_locals * locals, int testInt)
+Commstime_locals * Commstime_locals_ctor(Commstime_locals * locals)
 {
 	
 	return locals;
@@ -1207,7 +1209,8 @@ void default_scheduler_ctor(Scheduler_default * ctxt, int proc_node_pool_size, p
 	ctxt->unready = 0;
 }
 
-int default_scheduler_finish_proc(Scheduler_default * ctxt, proc * p)
+//int default_scheduler_finish_proc(Scheduler_default * ctxt, proc * p)
+int default_scheduler_finish_proc(proc * p)
 {
 	printf("cleaning up process %s\n", p->proc_name);
 	p->sched_state = _FINISHED_;
@@ -1215,7 +1218,7 @@ int default_scheduler_finish_proc(Scheduler_default * ctxt, proc * p)
 	return 0;
 }
 
-int default_scheduler_block_proc(Scheduler_default * ctxt, proc * p)
+void default_scheduler_block_proc(Scheduler_default * ctxt, proc * p)
 {
 	printf("blocking process %s\n", p->proc_name);
 	lock(p->spinlock);
@@ -1245,13 +1248,13 @@ int default_scheduler_run(Scheduler_default * ctxt)
 		unlock(p->spinlock);
 
 		printf("running process %s\n", p->proc_name);
-		p->body(p, ctxt);
+		p->body(p, &(ctxt->s));
 
 
 
 		if(p->state == _PS_EXCEPTION_)
 		{
-			if(0 != (ret_val = default_scheduler_finish_proc(ctxt, p)))
+			if(0 != (ret_val = default_scheduler_finish_proc(p)))
 			{
 				return ret_val;
 			}
@@ -1263,7 +1266,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 			if(p->parent != 0)
 			{
 				printf("first chance exception from %s: %s\n", p->proc_name, p->exception);
-				if(0 != (ret_val = Schedule_default( &(ctxt->s.ctxt), p->parent)))
+				if(0 != (ret_val = Schedule_default( &(ctxt->s), p->parent)))
 				{
 					printf("Fatal error from Schedule_default while trying to schedule parent %s of proc %s with unhandled exception\n", p->parent, p);
 					return ret_val;
@@ -1278,7 +1281,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 		else if(p->state == _PS_CLEAN_EXIT_)
 		{
 
-			if(0 != (ret_val = default_scheduler_finish_proc(ctxt, p)))
+			if(0 != (ret_val = default_scheduler_finish_proc(p)))
 			{
 				return ret_val;
 			}
@@ -1287,7 +1290,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 			// TODO possible race condition if parent is running and doesn't check that this child exited
 			if(p->parent != 0)
 			{
-				if(0 != (ret_val = Schedule_default( &(ctxt->s.ctxt), p->parent)))
+				if(0 != (ret_val = Schedule_default( &(ctxt->s), p->parent)))
 				{
 					printf("Fatal error from Schedule_default while trying to schedule parent %s of exiting proc %s\n", p->parent, p);
 					return ret_val;
@@ -1309,13 +1312,14 @@ int default_scheduler_run(Scheduler_default * ctxt)
 }
 
 
-
-int main(int argc, char ** argv)
+#define BUFF_SIZE 100
+//int main(int argc, char ** argv)
+int main()
 {
 	Scheduler_default ctxt;
 	Commstime_locals mproc_locals;
 	proc mproc;
-	char buffer[100];
+	char buffer[BUFF_SIZE];
 	int ret_val = 0;
 
 
@@ -1324,12 +1328,12 @@ int main(int argc, char ** argv)
 	default_scheduler_ctor(&ctxt, PROC_NODE_POOL_SIZE, proc_node_pool);
 
 	
-	Commstime_locals_ctor(&mproc_locals, 400);
+	Commstime_locals_ctor(&mproc_locals);
 
 	
 	proc_ctor(&mproc, "Commstime", 0, &mproc_locals, Commstime_body);
 
-	ret_val = Schedule_default( &(ctxt.s.ctxt), &mproc); // TODO just exit?  assert: ctxt.num_ready == 0 if ret_val != 0
+	ret_val = Schedule_default( &(ctxt.s), &mproc); // TODO just exit?  assert: ctxt.num_ready == 0 if ret_val != 0
 	
 
 	ret_val = default_scheduler_run(&ctxt);
@@ -1341,6 +1345,7 @@ int main(int argc, char ** argv)
 	}
 
 	printf("Press <enter> to exit.\n");
-	gets(&buffer);
+	//gets_s(buffer, BUFF_SIZE);
+	gets(buffer);
 	return ret_val;
 }
