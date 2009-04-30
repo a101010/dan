@@ -64,7 +64,7 @@ label:                                              \
     do                                                              \
     {                                                               \
         unsigned int tstate = state;                                \
-        __asm__ __volatile__("jmp %0" : : "m" ((void*) state));     \
+        __asm__ __volatile__("jmp %0" : : "m" (state));             \
     } while (0)                
 #endif // __i386__
 
