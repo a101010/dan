@@ -35,7 +35,7 @@ label:                                                  \
     {                                                       \
         unsigned int tstate = 0xdeadbeef;                   \
         state = tstate;                                     \
-        __asm__ __volatile__("movl $label, %0; label:"      \
+        __asm__ __volatile__("movl $" #label ", %0; " #label ":"      \
             : "=m" (state)                                  \
         );                                                  \
     } while (0)        
