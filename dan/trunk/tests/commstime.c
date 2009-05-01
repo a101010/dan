@@ -338,7 +338,7 @@ void Delta_body(proc * p, scheduler * s)
         restoreState(p->state);
 	while(1)
 	{
-        saveState(p->state, S1);
+        saveState(p->state, Delta_S1);
 		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_in]->chans, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
@@ -364,7 +364,7 @@ void Delta_body(proc * p, scheduler * s)
 			printf("Delta: wrote value %d to out1\n", locals->value);
 			break;
 		case 1 : // blocked
-            saveState(p->state, S2);
+            saveState(p->state, Delta_S2);
             if(result == 1)
                 goto EXIT;
             result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, (void **) &p->exception, p, s);
@@ -403,7 +403,7 @@ void Delta_body(proc * p, scheduler * s)
 			p->state = _PS_READY_TO_RUN_;
 			break;
 		case 1 : // blocked
-			saveState(p->state, S3);
+			saveState(p->state, Delta_S3);
             if(result == 1)
                 goto EXIT;
             result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, (void **) &p->exception, p, s);
@@ -588,121 +588,120 @@ Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bund
 
 void Prefix_body(proc * p, scheduler * s)
 {
-	int result;
-	int blocked = 0;
-
+	int result = 0;
 	Prefix_locals * locals = (Prefix_locals*) p->locals;
+    if(p->state != _PS_READY_TO_RUN_)
+        restoreState(p->state);
 
-	while(!blocked)
+    printf("Prefix init value: %d\n", locals->value); 
+	// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
+	//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
+	result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &(p->exception), p, s); 
+	switch(result)
 	{
-		switch(p->state)
+	case 0: // wrote value and synced
+		printf("Prefix wrote value %d\n", locals->value);
+		break;
+	case 1: // wrote value and blocked
+        saveState(p->state, Prefix_S1);
+        if(result == 1)
+            goto EXIT;
+		result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, (void **) &(p->exception), p, s); 
+		switch(result)
 		{
-		case _PS_READY_TO_RUN_:
-			printf("Prefix init value: %d\n", locals->value); 
-			// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
-			//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &(p->exception), p, s); 
-			switch(result)
-			{
-			case 0: // wrote value and synced
-				p->state = _PS_READY_TO_RUN_ + 2;
-				printf("Prefix wrote value %d\n", locals->value);
-				break;
-			case 1: // wrote value and blocked
-				p->state = _PS_READY_TO_RUN_ + 1;
-				blocked = 1;
-				break;
-			case 2: // exception was thrown
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
+		case 0: // wrote value and synced
+			printf("Prefix wrote value %d\n", locals->value);
 			break;
-		case _PS_READY_TO_RUN_ + 1:
-			// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
-			//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, (void **) &(p->exception), p, s); 
-			switch(result)
-			{
-			case 0: // wrote value and synced
-				p->state = _PS_READY_TO_RUN_ + 2;
-				printf("Prefix wrote value %d\n", locals->value);
-				break;
-			case 1: // wrote value and blocked
-				p->state = _PS_READY_TO_RUN_ + 1;
-				blocked = 1;
-				break;
-			case 2: // exception was thrown
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
-			break;
-		case _PS_READY_TO_RUN_ + 2:
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_in]->chans, &(locals->value), &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // read value
-				printf("Prefix: read value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 3;
-				break;
-			case 1 : // blocked
-				// let it read again
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanRead_BInt_c_0 in Prefix_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				blocked = 1; 
-				p->exception = "unexpected result from ChanRead_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
-			break;
-		case _PS_READY_TO_RUN_ + 3:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // wrote value
-				printf("Prefix: wrote value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 2;
-				break;
-			case 1 : // blocked
-				// let it try writing again
-				p->state = _PS_READY_TO_RUN_ + 1;
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
-			break;
-		default:
-			printf("Unsupported process state in Prefix_body: %d\n", p->state);
-			p->exception = "Unsupported process state in Prefix_body\n";
+		case 1: // wrote value and blocked
+			goto EXIT;
+		case 2: // exception was thrown
 			p->state = _PS_EXCEPTION_;
-			blocked = 1;
+			goto EXIT;
+		default:
+			printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+            goto EXIT;
 		}
+		break;
+	case 2: // exception was thrown
+		p->state = _PS_EXCEPTION_;
+		goto EXIT;
+	default:
+		printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+		p->state = _PS_EXCEPTION_;
+		p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+        goto EXIT;
 	}
 
+	while(1)
+	{
+        saveState(p->state, Prefix_S2);
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_in]->chans, &(locals->value), &p->exception, p, s);
+		switch(result)
+		{
+		case 0 : // read value
+			printf("Prefix: read value %d\n", locals->value);
+			break;
+		case 1 : // blocked
+			// let it read again
+			goto EXIT;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
+		default:
+			printf("unexpected result from ChanRead_BInt_c_0 in Prefix_body: %d\n", result);
+			p->state = _PS_EXCEPTION_; 
+			p->exception = "unexpected result from ChanRead_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+            goto EXIT;
+		}
+		
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &p->exception, p, s);
+		switch(result)
+		{
+		case 0 : // wrote value
+			printf("Prefix: wrote value %d\n", locals->value);
+			break;
+		case 1: // wrote value and blocked
+            saveState(p->state, Prefix_S3);
+            if(result == 1)
+                goto EXIT;
+		    result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, (void **) &(p->exception), p, s); 
+		    switch(result)
+		    {
+		    case 0: // wrote value and synced
+			    printf("Prefix wrote value %d\n", locals->value);
+			    break;
+		    case 1: // wrote value and blocked
+			    goto EXIT;
+		    case 2: // exception was thrown
+			    p->state = _PS_EXCEPTION_;
+			    goto EXIT;
+		    default:
+			    printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+			    p->state = _PS_EXCEPTION_;
+			    p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+                goto EXIT;
+		    }
+		    break;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
+		default:
+			printf("unexpected result from ChanWrite_BInt_c_0 in Prefix_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Prefix_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+            goto EXIT;
+		}
+	} // while (1)
+
+    // since we have an infinite loop above, we'll never get here
+    // but this is where we'd set _PS_CLEAN_EXIT_ if we didn't
+    // have an infinite loop
+    p->state = _PS_CLEAN_EXIT_;
+EXIT:
+    // if it is a real exit, clean up our channels
+    // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
 		locals->__ends__[BUNDLE_END_Prefix_in]->poison(locals->__ends__[BUNDLE_END_Prefix_in]->chans, s);
