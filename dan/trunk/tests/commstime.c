@@ -830,151 +830,157 @@ void Commstime_body(proc * p, scheduler * s)
 	int finished = 0;
 	int exception = 0;
 	Commstime_locals * locals = (Commstime_locals*) p->locals;
-	switch(p->state)
+    if(p->state != _PS_READY_TO_RUN_)
+        restoreState(p->state);
+
+	BInt_chans_ctor( &(locals->a) );
+	BInt_reader_end_ctor( &(locals->a_reader), &(locals->a));
+	BInt_writer_end_ctor( &(locals->a_writer), &(locals->a));
+
+	BInt_chans_ctor( &(locals->b) );
+	BInt_reader_end_ctor( &(locals->b_reader), &(locals->b));
+	BInt_writer_end_ctor( &(locals->b_writer), &(locals->b));
+
+	BInt_chans_ctor( &(locals->c) );
+	BInt_reader_end_ctor( &(locals->c_reader), &(locals->c));
+	BInt_writer_end_ctor( &(locals->c_writer), &(locals->c));
+
+	BInt_chans_ctor( &(locals->d) );
+	BInt_reader_end_ctor( &(locals->d_reader), &(locals->d));
+	BInt_writer_end_ctor( &(locals->d_writer), &(locals->d));
+
+	Delta_locals_ctor( &(locals->pDelta1_locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
+	proc_ctor( &(locals->pDelta1), "Delta", p, &(locals->pDelta1_locals), Delta_body);
+
+	Count_locals_ctor( &(locals->pCount1_locals), &(locals->b_reader));
+	proc_ctor( &(locals->pCount1), "Count", p, &(locals->pCount1_locals), Count_body);
+	
+	Prefix_locals_ctor( &(locals->pPrefix1_locals), &(locals->d_reader), &(locals->a_writer), 22);
+	proc_ctor( &(locals->pPrefix1), "Prefix", p, &(locals->pPrefix1_locals), Prefix_body);
+
+	Succ_locals_ctor( &(locals->pSucc1_locals), &(locals->c_reader), &(locals->d_writer));
+	proc_ctor( &(locals->pSucc1), "Succ", p, &(locals->pSucc1_locals), Succ_body);
+	
+	s->schedule(s, &(locals->pPrefix1));
+	s->schedule(s, &(locals->pDelta1));
+	s->schedule(s, &(locals->pSucc1));
+	s->schedule(s, &(locals->pCount1));
+		
+	saveState(p->state, Commstime_S1);
+	lock(locals->pCount1.spinlock);
+	if(locals->pCount1.sched_state == _FINISHED_)
 	{
-	case _PS_READY_TO_RUN_:
-		BInt_chans_ctor( &(locals->a) );
-		BInt_reader_end_ctor( &(locals->a_reader), &(locals->a));
-		BInt_writer_end_ctor( &(locals->a_writer), &(locals->a));
-
-		BInt_chans_ctor( &(locals->b) );
-		BInt_reader_end_ctor( &(locals->b_reader), &(locals->b));
-		BInt_writer_end_ctor( &(locals->b_writer), &(locals->b));
-
-		BInt_chans_ctor( &(locals->c) );
-		BInt_reader_end_ctor( &(locals->c_reader), &(locals->c));
-		BInt_writer_end_ctor( &(locals->c_writer), &(locals->c));
-
-		BInt_chans_ctor( &(locals->d) );
-		BInt_reader_end_ctor( &(locals->d_reader), &(locals->d));
-		BInt_writer_end_ctor( &(locals->d_writer), &(locals->d));
-
-		Delta_locals_ctor( &(locals->pDelta1_locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
-		proc_ctor( &(locals->pDelta1), "Delta", p, &(locals->pDelta1_locals), Delta_body);
-
-		Count_locals_ctor( &(locals->pCount1_locals), &(locals->b_reader));
-		proc_ctor( &(locals->pCount1), "Count", p, &(locals->pCount1_locals), Count_body);
-		
-		Prefix_locals_ctor( &(locals->pPrefix1_locals), &(locals->d_reader), &(locals->a_writer), 22);
-		proc_ctor( &(locals->pPrefix1), "Prefix", p, &(locals->pPrefix1_locals), Prefix_body);
-
-		Succ_locals_ctor( &(locals->pSucc1_locals), &(locals->c_reader), &(locals->d_writer));
-		proc_ctor( &(locals->pSucc1), "Succ", p, &(locals->pSucc1_locals), Succ_body);
-		
-		s->schedule(s, &(locals->pPrefix1));
-		s->schedule(s, &(locals->pDelta1));
-		s->schedule(s, &(locals->pSucc1));
-		s->schedule(s, &(locals->pCount1));
-		p->state = _PS_READY_TO_RUN_ + 1;
-
-		break;
-	case _PS_READY_TO_RUN_ + 1:
-		
-
-		lock(locals->pCount1.spinlock);
-		if(locals->pCount1.sched_state == _FINISHED_)
+		finished += 1;
+		if(locals->pCount1.state == _PS_EXCEPTION_)
 		{
-			finished += 1;
-			if(locals->pCount1.state == _PS_EXCEPTION_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = locals->pCount1.exception;
-				printf("Commstime caught exception from pCount1\n");
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = locals->pCount1.exception;
+			printf("Commstime caught exception from pCount1\n");
 
-			}
-			else if(locals->pCount1.state !=  _PS_CLEAN_EXIT_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = "Commstime: pCount1 didn't exit cleanly, but didn't throw exception\n";
-			}
 		}
-		unlock(locals->pCount1.spinlock);
-
-		lock(locals->pPrefix1.spinlock);
-		if(locals->pPrefix1.sched_state == _FINISHED_)
+		else if(locals->pCount1.state !=  _PS_CLEAN_EXIT_)
 		{
-			finished += 1;
-			if(locals->pPrefix1.state == _PS_EXCEPTION_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = locals->pPrefix1.exception;
-				printf("Commstime caught exception from pPrefix1\n");
-
-			}
-			else if(locals->pPrefix1.state !=  _PS_CLEAN_EXIT_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = "Commstime: pPrefix1 didn't exit cleanly, but didn't throw exception\n";
-			}
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = "Commstime: pCount1 didn't exit cleanly, but didn't throw exception\n";
 		}
-		unlock(locals->pPrefix1.spinlock);
+	}
+	unlock(locals->pCount1.spinlock);
 
-		lock(locals->pSucc1.spinlock);
-		if(locals->pSucc1.sched_state == _FINISHED_)
+	lock(locals->pPrefix1.spinlock);
+	if(locals->pPrefix1.sched_state == _FINISHED_)
+	{
+		finished += 1;
+		if(locals->pPrefix1.state == _PS_EXCEPTION_)
 		{
-			finished += 1;
-			if(locals->pSucc1.state == _PS_EXCEPTION_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = locals->pSucc1.exception;
-				printf("Commstime caught exception from pSucc1\n");
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = locals->pPrefix1.exception;
+			printf("Commstime caught exception from pPrefix1\n");
 
-			}
-			else if(locals->pSucc1.state !=  _PS_CLEAN_EXIT_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = "Commstime: pSucc1 didn't exit cleanly, but didn't throw exception\n";
-			}
 		}
-		unlock(locals->pSucc1.spinlock);
-
-		lock(locals->pDelta1.spinlock);
-		if(locals->pDelta1.sched_state == _FINISHED_)
+		else if(locals->pPrefix1.state !=  _PS_CLEAN_EXIT_)
 		{
-			finished += 1;
-			if(locals->pDelta1.state == _PS_EXCEPTION_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = locals->pDelta1.exception;
-				printf("Commstime caught exception from pDelta1\n");
-			}
-			else if(locals->pDelta1.state !=  _PS_CLEAN_EXIT_)
-			{
-				exception += 1;
-				p->state = _PS_EXCEPTION_;
-				p->exception = "Commstime: pDelta1 didn't exit cleanly, but didn't throw exception\n";
-			}
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = "Commstime: pPrefix1 didn't exit cleanly, but didn't throw exception\n";
 		}
-		unlock(locals->pDelta.spinlock);
+	}
+	unlock(locals->pPrefix1.spinlock);
 
-		if(exception > 0)
+	lock(locals->pSucc1.spinlock);
+	if(locals->pSucc1.sched_state == _FINISHED_)
+	{
+		finished += 1;
+		if(locals->pSucc1.state == _PS_EXCEPTION_)
 		{
-			printf("Commstime: exceptions from %d processes, retiring the other processes in the par\n", exception);
-			// TODO what is the best way to clean up all the processes?
-		}
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = locals->pSucc1.exception;
+			printf("Commstime caught exception from pSucc1\n");
 
-		if(finished == 4)
-		{
-			if(locals->pCount1.state == _PS_CLEAN_EXIT_
-				&& locals->pPrefix1.state == _PS_CLEAN_EXIT_
-				&& locals->pSucc1.state == _PS_CLEAN_EXIT_
-				&& locals->pDelta1.state == _PS_CLEAN_EXIT_)
-			{
-				p->state = _PS_CLEAN_EXIT_;
-				printf("Commstime exiting cleanly\n");
-			}
 		}
-		break;
-	default:
-		printf("Unsupported process state in Commstime_body: %d\n", p->state);
-	}// switch
+		else if(locals->pSucc1.state !=  _PS_CLEAN_EXIT_)
+		{
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = "Commstime: pSucc1 didn't exit cleanly, but didn't throw exception\n";
+		}
+	}
+	unlock(locals->pSucc1.spinlock);
+
+	lock(locals->pDelta1.spinlock);
+	if(locals->pDelta1.sched_state == _FINISHED_)
+	{
+		finished += 1;
+		if(locals->pDelta1.state == _PS_EXCEPTION_)
+		{
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = locals->pDelta1.exception;
+			printf("Commstime caught exception from pDelta1\n");
+		}
+		else if(locals->pDelta1.state !=  _PS_CLEAN_EXIT_)
+		{
+			exception += 1;
+			p->state = _PS_EXCEPTION_;
+			p->exception = "Commstime: pDelta1 didn't exit cleanly, but didn't throw exception\n";
+		}
+	}
+	unlock(locals->pDelta.spinlock);
+
+	if(exception > 0)
+	{
+		printf("Commstime: exceptions from %d processes, retiring the other processes in the par\n", exception);
+		// TODO what is the best way to clean up all the processes?
+	}
+
+	if(finished == 4)
+	{
+		if(locals->pCount1.state != _PS_CLEAN_EXIT_
+			|| locals->pPrefix1.state != _PS_CLEAN_EXIT_
+			|| locals->pSucc1.state != _PS_CLEAN_EXIT_
+			|| locals->pDelta1.state != _PS_CLEAN_EXIT_)
+		{
+            p->state = _PS_EXCEPTION_;
+            printf("Commstime: four exited PAR, but not all cleanly\n");
+            goto EXIT;
+		}
+        else
+        {
+            printf("Commstime: PAR exiting cleanly\n");
+        }
+	}
+    else
+    {
+        goto EXIT;
+    }
+
+    p->state = _PS_CLEAN_EXIT_;
+EXIT:
+    return;
+
 }
 
 
