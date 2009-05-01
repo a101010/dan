@@ -19,6 +19,7 @@ typedef int int32;
 typedef unsigned int uint;
 
 struct scheduler_tag;
+struct proc_tag;
 
 typedef int (*OpSchedule)(struct scheduler_tag * ctxt, struct proc_tag * p);
 
@@ -68,23 +69,26 @@ char * scheduler_state_to_string(scheduler_state state)
 typedef struct proc_tag 
 {
 	// TODO what can we do to shrink this?
-	char * proc_name; // this may ultimately evolve into a pointer to a proc type structure (similar to a type class in Java or .NET) For now we need it for exeptions and debugging
+    list_node node;
+	char * proc_name;   // this may ultimately evolve into a pointer to a proc type structure 
+                        // (similar to a type class in Java or .NET) For now we need it for exeptions 
+                        // and debugging
 	struct proc_tag * parent; // we need it so we can schedule our parent when we exit
-	void * locals;
-	uint state; // corresponds to the instruction pointer
+	//void * locals;
+	uint state; // corresponds to the instruction pointer 
+                // see saveState and restoreState, and the special defines above
 	char * exception; // TODO eventually we need an exception structure
 	OpProcBody body;
 	char * spinlock; // protects the sched_state TODO need to protect anything else?
 	scheduler_state sched_state; // state in the scheduler TODO can combine with the spin lock?
-	proc_node * node; // TODO I don't really like this... it's a pointer to the scheduler's list node for this proc and is needed by OpSchedule; need to carefully consider alternatives (one is to have proc itself be the list node...)
 } proc;
 
 // constructor
-void proc_ctor(proc * p, char * proc_name, proc * parent, void * locals, OpProcBody body)
+void proc_ctor(proc * p, char * proc_name, proc * parent, /* void * locals,*/ OpProcBody body)
 {
 	p->proc_name = proc_name;
 	p->parent = parent;
-	p->locals = locals;
+	//p->locals = locals;
 	p->exception = 0;
 	p->state = _PS_READY_TO_RUN_;
 	p->body = body;
@@ -325,15 +329,21 @@ bundle_end * BInt_writer_end_ctor(bundle_end * wrEnd, BInt_chans * chans)
 #define BUNDLE_END_Delta_out2 2
 typedef struct Delta_locals_tag
 {
-	int32 value;
-	bundle_end * __ends__[3]; 
+	int32       value;
+	bundle_end  *__ends__[3]; 
 } Delta_locals;
 
+typedef struct Delta_proc_tag
+{
+    proc            p;
+    Delta_locals    locals;
+} Delta_proc;
 
 void Delta_body(proc * p, scheduler * s)
 {
 	int result = 0;
-	Delta_locals* locals = (Delta_locals*) p->locals;
+    Delta_proc *dp = (Delta_proc *) p;
+	Delta_locals* locals = &(dp->locals);
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 	while(1)
@@ -469,12 +479,17 @@ typedef struct Succ_locals_tag
 	bundle_end * __ends__[NUM_Succ_BUNDLE_ENDS];
 } Succ_locals;
 
-
+typedef struct Succ_proc_tag
+{
+    proc        p;
+    Succ_locals locals;
+} Succ_proc;
 
 void Succ_body(proc * p, scheduler *s)
 {
 	int result = 0;
-	Succ_locals* locals = (Succ_locals*) p->locals;
+    Succ_proc* ps = (Succ_proc*) p;
+	Succ_locals* locals = &(ps->locals);
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 	while(1)
@@ -576,6 +591,12 @@ typedef struct Prefix_locals_tag
 	bundle_end * __ends__[NUM_Prefix_BUNDLE_ENDS]; 
 } Prefix_locals;
 
+typedef struct Prefix_proc_tag
+{
+    proc          p;
+    Prefix_locals locals;
+} Prefix_proc;
+
 // Prefix_locals constructor
 Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bundle_end * out, int32 initValue)
 {
@@ -589,7 +610,8 @@ Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bund
 void Prefix_body(proc * p, scheduler * s)
 {
 	int result = 0;
-	Prefix_locals * locals = (Prefix_locals*) p->locals;
+    Prefix_proc *pp = (Prefix_proc*) p;
+	Prefix_locals * locals = &(pp->locals);
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 
@@ -724,6 +746,12 @@ typedef struct Count_locals_tag
 	bundle_end * __ends__[NUM_Count_BUNDLE_ENDS];
 } Count_locals;
 
+typedef struct Count_proc_tag
+{
+    proc            p;
+    Count_locals    locals;
+} Count_proc;
+
 // Count_locals constructor
 Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 {
@@ -736,7 +764,8 @@ Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 void Count_body(proc * p, scheduler * s)
 {
 	int result = 0;
-	Count_locals * locals = p->locals;
+    Count_proc *cp = (Count_proc*) p;
+	Count_locals * locals = &(cp->locals);
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 
@@ -808,20 +837,20 @@ typedef struct Commstime_locals_tag
 	BInt_chans d;
 	bundle_end d_reader;
 	bundle_end d_writer;
-	proc pDelta1;
-	Delta_locals pDelta1_locals;
-	proc pSucc1;
-	Succ_locals pSucc1_locals;
-	proc pPrefix1;
-	Prefix_locals pPrefix1_locals;
-	proc pCount1;
-	Count_locals pCount1_locals;
-
+	Delta_proc pDelta1;
+	Succ_proc pSucc1;
+	Prefix_proc pPrefix1;
+	Count_proc pCount1;
 } Commstime_locals;
+
+typedef struct Commstime_proc_tag
+{
+    proc                p;
+    Commstime_locals    locals;
+} Commstime_proc;
 
 Commstime_locals * Commstime_locals_ctor(Commstime_locals * locals)
 {
-	
 	return locals;
 }
 
@@ -829,7 +858,8 @@ void Commstime_body(proc * p, scheduler * s)
 {
 	int finished = 0;
 	int exception = 0;
-	Commstime_locals * locals = (Commstime_locals*) p->locals;
+    Commstime_proc *cp = (Commstime_proc*) p;
+	Commstime_locals * locals = &(cp->locals);
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 
@@ -849,17 +879,17 @@ void Commstime_body(proc * p, scheduler * s)
 	BInt_reader_end_ctor( &(locals->d_reader), &(locals->d));
 	BInt_writer_end_ctor( &(locals->d_writer), &(locals->d));
 
-	Delta_locals_ctor( &(locals->pDelta1_locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
-	proc_ctor( &(locals->pDelta1), "Delta", p, &(locals->pDelta1_locals), Delta_body);
+	Delta_locals_ctor( &(locals->pDelta1.locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
+	proc_ctor( &(locals->pDelta1), "Delta", p, Delta_body);
 
-	Count_locals_ctor( &(locals->pCount1_locals), &(locals->b_reader));
-	proc_ctor( &(locals->pCount1), "Count", p, &(locals->pCount1_locals), Count_body);
+	Count_locals_ctor( &(locals->pCount1.locals), &(locals->b_reader));
+	proc_ctor( &(locals->pCount1), "Count", p, Count_body);
 	
-	Prefix_locals_ctor( &(locals->pPrefix1_locals), &(locals->d_reader), &(locals->a_writer), 22);
-	proc_ctor( &(locals->pPrefix1), "Prefix", p, &(locals->pPrefix1_locals), Prefix_body);
+	Prefix_locals_ctor( &(locals->pPrefix1.locals), &(locals->d_reader), &(locals->a_writer), 22);
+	proc_ctor( &(locals->pPrefix1), "Prefix", p, Prefix_body);
 
-	Succ_locals_ctor( &(locals->pSucc1_locals), &(locals->c_reader), &(locals->d_writer));
-	proc_ctor( &(locals->pSucc1), "Succ", p, &(locals->pSucc1_locals), Succ_body);
+	Succ_locals_ctor( &(locals->pSucc1.locals), &(locals->c_reader), &(locals->d_writer));
+	proc_ctor( &(locals->pSucc1), "Succ", p, Succ_body);
 	
 	s->schedule(s, &(locals->pPrefix1));
 	s->schedule(s, &(locals->pDelta1));
@@ -867,88 +897,88 @@ void Commstime_body(proc * p, scheduler * s)
 	s->schedule(s, &(locals->pCount1));
 		
 	saveState(p->state, Commstime_S1);
-	lock(locals->pCount1.spinlock);
-	if(locals->pCount1.sched_state == _FINISHED_)
+	lock(locals->pCount1.p.spinlock);
+	if(locals->pCount1.p.sched_state == _FINISHED_)
 	{
 		finished += 1;
-		if(locals->pCount1.state == _PS_EXCEPTION_)
+		if(locals->pCount1.p.state == _PS_EXCEPTION_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
-			p->exception = locals->pCount1.exception;
+			p->exception = locals->pCount1.p.exception;
 			printf("Commstime caught exception from pCount1\n");
 
 		}
-		else if(locals->pCount1.state !=  _PS_CLEAN_EXIT_)
+		else if(locals->pCount1.p.state !=  _PS_CLEAN_EXIT_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
 			p->exception = "Commstime: pCount1 didn't exit cleanly, but didn't throw exception\n";
 		}
 	}
-	unlock(locals->pCount1.spinlock);
+	unlock(locals->pCount1.p.spinlock);
 
-	lock(locals->pPrefix1.spinlock);
-	if(locals->pPrefix1.sched_state == _FINISHED_)
+	lock(locals->pPrefix1.p.spinlock);
+	if(locals->pPrefix1.p.sched_state == _FINISHED_)
 	{
 		finished += 1;
-		if(locals->pPrefix1.state == _PS_EXCEPTION_)
+		if(locals->pPrefix1.p.state == _PS_EXCEPTION_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
-			p->exception = locals->pPrefix1.exception;
+			p->exception = locals->pPrefix1.p.exception;
 			printf("Commstime caught exception from pPrefix1\n");
 
 		}
-		else if(locals->pPrefix1.state !=  _PS_CLEAN_EXIT_)
+		else if(locals->pPrefix1.p.state !=  _PS_CLEAN_EXIT_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
 			p->exception = "Commstime: pPrefix1 didn't exit cleanly, but didn't throw exception\n";
 		}
 	}
-	unlock(locals->pPrefix1.spinlock);
+	unlock(locals->pPrefix1.p.spinlock);
 
-	lock(locals->pSucc1.spinlock);
-	if(locals->pSucc1.sched_state == _FINISHED_)
+	lock(locals->pSucc1.p.spinlock);
+	if(locals->pSucc1.p.sched_state == _FINISHED_)
 	{
 		finished += 1;
-		if(locals->pSucc1.state == _PS_EXCEPTION_)
+		if(locals->pSucc1.p.state == _PS_EXCEPTION_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
-			p->exception = locals->pSucc1.exception;
+			p->exception = locals->pSucc1.p.exception;
 			printf("Commstime caught exception from pSucc1\n");
 
 		}
-		else if(locals->pSucc1.state !=  _PS_CLEAN_EXIT_)
+		else if(locals->pSucc1.p.state !=  _PS_CLEAN_EXIT_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
 			p->exception = "Commstime: pSucc1 didn't exit cleanly, but didn't throw exception\n";
 		}
 	}
-	unlock(locals->pSucc1.spinlock);
+	unlock(locals->pSucc1.p.spinlock);
 
-	lock(locals->pDelta1.spinlock);
-	if(locals->pDelta1.sched_state == _FINISHED_)
+	lock(locals->pDelta1.p.spinlock);
+	if(locals->pDelta1.p.sched_state == _FINISHED_)
 	{
 		finished += 1;
-		if(locals->pDelta1.state == _PS_EXCEPTION_)
+		if(locals->pDelta1.p.state == _PS_EXCEPTION_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
-			p->exception = locals->pDelta1.exception;
+			p->exception = locals->pDelta1.p.exception;
 			printf("Commstime caught exception from pDelta1\n");
 		}
-		else if(locals->pDelta1.state !=  _PS_CLEAN_EXIT_)
+		else if(locals->pDelta1.p.state !=  _PS_CLEAN_EXIT_)
 		{
 			exception += 1;
 			p->state = _PS_EXCEPTION_;
 			p->exception = "Commstime: pDelta1 didn't exit cleanly, but didn't throw exception\n";
 		}
 	}
-	unlock(locals->pDelta.spinlock);
+	unlock(locals->pDelta.p.spinlock);
 
 	if(exception > 0)
 	{
@@ -958,10 +988,10 @@ void Commstime_body(proc * p, scheduler * s)
 
 	if(finished == 4)
 	{
-		if(locals->pCount1.state != _PS_CLEAN_EXIT_
-			|| locals->pPrefix1.state != _PS_CLEAN_EXIT_
-			|| locals->pSucc1.state != _PS_CLEAN_EXIT_
-			|| locals->pDelta1.state != _PS_CLEAN_EXIT_)
+		if(locals->pCount1.p.state != _PS_CLEAN_EXIT_
+			|| locals->pPrefix1.p.state != _PS_CLEAN_EXIT_
+			|| locals->pSucc1.p.state != _PS_CLEAN_EXIT_
+			|| locals->pDelta1.p.state != _PS_CLEAN_EXIT_)
 		{
             p->state = _PS_EXCEPTION_;
             printf("Commstime: four exited PAR, but not all cleanly\n");
@@ -1014,9 +1044,9 @@ EXIT:
 // 
 // When a proc needs to schedule another proc, it calls the schedule method passed to it
 // this could either add the proc to a list of procs to be scheduled, or it could add it directly to the ready list
-// We need to be able to find the proc_node to insert it in the ready list, and it must not already be in the ready list
+// We need to be able to find the list_node to insert it in the ready list, and it must not already be in the ready list
 // Or we must be able to see that it is in the ready list and not add it again
-// If each proc_node also knows which list it is associated with, we can do that (triplly linked list?), however, that is not scaleable to
+// If each list_node also knows which list it is associated with, we can do that (triplly linked list?), however, that is not scaleable to
 // the situation of multiple schedulers (such as one scheduler per processor)
 // We don't want a proc to be able to exist in the ready list twice
 // We don't want a proc to be able to exist in the ready list of multiple schedulers
@@ -1025,7 +1055,7 @@ EXIT:
 // Of course, we'll only have this problem (for the case of a child notifying a parent) when the parent forked the child, which is still down the road a bit
 // Otherwise, the parent cannot run until all children have exited
 // But we can have a race between two exiting children
-// We could require a lock, but where?  the scheduler will navigate to the proc from the proc_node and the proc will navigate to the scheduler (to find out if its parent is ready) through its proc node
+// We could require a lock, but where?  the scheduler will navigate to the proc from the list_node and the proc will navigate to the scheduler (to find out if its parent is ready) through its proc node
 // and that connection is subject to the race
 // We need to solve this for the case of a channel scheduling a proc also
 // We can use schedule_state (governed by a lock) in the proc itself - running, scheduled, notscheduled
@@ -1034,7 +1064,7 @@ EXIT:
 // Can we just make sure that any operation where a proc waits (for a channel or completing child) checks if the channel is ready or a child has finished and sets schedule_state to not_running as an atomic sequence?
 
 
-// TODO make proc.h (for proc, proc_node, and pl functions
+// TODO make proc.h (for proc, list_node, and pl functions
 
 // TODO will probably have to put double underscores __around__ all of the identifiers... <sigh>  later!
 
@@ -1049,12 +1079,9 @@ typedef struct Scheduler_default_tag
 {
 	scheduler s; // interface to pass to processes
 	int num_ready;
-	proc_node * ready;  // the ready list
+	list_node * ready;  // the ready list
 	int num_unready;
-	proc_node * unready; // the list of procs that are not ready but have not exited
-	int proc_node_pool_size;
-	proc_node * proc_node_pool; // the pool of unallocated proc_nodes (array of proc_nodes)
-	int next_proc_node; // index in to proc_node_pool of the next unallocated proc // TODO this does not recycle proc_nodes, but that isn't important for commstime
+	list_node * unready; // the list of procs that are not ready but have not exited
 } Scheduler_default;
 
 // this is a default implementation of OpSchedule
@@ -1062,8 +1089,8 @@ typedef struct Scheduler_default_tag
 int Schedule_default(scheduler * s, proc * p)
 {
 	Scheduler_default * _ctxt;
-	proc_node * pn;
-	proc_node * result_node;
+	list_node * pn;
+	list_node * result_node;
 
 	lock(p->spinlock);
 	if(p->sched_state == _RUNNING_ || p->sched_state == _READY_)
@@ -1078,7 +1105,7 @@ int Schedule_default(scheduler * s, proc * p)
 	if(p->sched_state == _BLOCKED_)
 	{
 		p->sched_state = _READY_;
-		result_node = pl_remove( &(_ctxt->unready), p->node);
+		result_node = list_remove( &(_ctxt->unready), &(p->node));
 		if(result_node == 0)
 		{
 			printf("Schedule_default error: node could not be removed from the unready list\n");
@@ -1086,25 +1113,13 @@ int Schedule_default(scheduler * s, proc * p)
 			return -1;
 		}
 		--(_ctxt->num_unready);
-		pl_push_tail( &(_ctxt->ready), p->node);
+		list_push_tail( &(_ctxt->ready), &(p->node));
 		++(_ctxt->num_ready);
 	}
 	else if(p->sched_state == _FREE_)
 	{
-		if(_ctxt->next_proc_node >= _ctxt->proc_node_pool_size)
-		{
-			printf("Schedule_default: proc_node pool exhausted\n");
-			unlock(p->spinlock);
-			return -1;
-		}
-		//TODO is this allocating correctly?
-		pn = _ctxt->proc_node_pool + _ctxt->next_proc_node;
-		pn = &(_ctxt->proc_node_pool[_ctxt->next_proc_node]);
-		++(_ctxt->next_proc_node);
-		pn->p = p;
-		p->node = pn;
 		p->sched_state = _READY_;
-		pl_push_tail( &(_ctxt->ready), p->node);
+		list_push_tail( &(_ctxt->ready), &(p->node));
 		++(_ctxt->num_ready);
 	}
 	else
@@ -1117,20 +1132,15 @@ int Schedule_default(scheduler * s, proc * p)
 }
 
 
-#define PROC_NODE_POOL_SIZE 10
-
 // default_scheduler 
 // 
 // default scheduler constructor
-void default_scheduler_ctor(Scheduler_default * ctxt, int proc_node_pool_size, proc_node * proc_node_pool)
+void default_scheduler_ctor(Scheduler_default * ctxt)
 {
 	ctxt->s.ctxt = ctxt;
 	ctxt->s.schedule =  Schedule_default;
 	ctxt->num_ready = 0;
 	ctxt->num_unready = 0;
-	ctxt->proc_node_pool_size = proc_node_pool_size;
-	ctxt->proc_node_pool = proc_node_pool;
-	ctxt->next_proc_node = 0;
 	ctxt->ready = 0;
 	ctxt->unready = 0;
 }
@@ -1140,7 +1150,6 @@ int default_scheduler_finish_proc(proc * p)
 {
 	printf("cleaning up process %s\n", p->proc_name);
 	p->sched_state = _FINISHED_;
-	// TODO recyle the proc_node
 	return 0;
 }
 
@@ -1151,7 +1160,7 @@ void default_scheduler_block_proc(Scheduler_default * ctxt, proc * p)
 	p->sched_state = _BLOCKED_;
 	unlock(p->spinlock);
 
-	pl_push_tail( &(ctxt->unready), p->node);
+	list_push_tail( &(ctxt->unready), &(p->node));
 	++(ctxt->num_unready);
 }
 
@@ -1160,14 +1169,14 @@ void default_scheduler_block_proc(Scheduler_default * ctxt, proc * p)
 int default_scheduler_run(Scheduler_default * ctxt)
 {
 	int ret_val = 1;
-	proc_node * pn;
+	list_node * pn;
 	proc * p;
 	while(ctxt->num_ready > 0)
 	{
-		pn = pl_pop_head( &(ctxt->ready));
+		pn = list_pop_head( &(ctxt->ready));
 		--(ctxt->num_ready);
 
-		p = (proc*) pn->p;
+		p = (proc*) pn;
 
 		lock(p->spinlock);
 		p->sched_state = _RUNNING_;
@@ -1186,7 +1195,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 			}
 
 
-			// TODO need to handle proc_node and any other cleanup
+			// TODO need to handle list_node and any other cleanup
 
 			// if there is a parent, schedule it so it has a chance to handle the exception
 			if(p->parent != 0)
@@ -1238,28 +1247,23 @@ int default_scheduler_run(Scheduler_default * ctxt)
 }
 
 
-#define BUFF_SIZE 100
+
 //int main(int argc, char ** argv)
 int main()
 {
 	Scheduler_default ctxt;
-	Commstime_locals mproc_locals;
-	proc mproc;
-	char buffer[BUFF_SIZE];
+	Commstime_proc cp;
 	int ret_val = 0;
 
-
-
-	proc_node proc_node_pool[PROC_NODE_POOL_SIZE];
-	default_scheduler_ctor(&ctxt, PROC_NODE_POOL_SIZE, proc_node_pool);
+	default_scheduler_ctor(&ctxt);
 
 	
-	Commstime_locals_ctor(&mproc_locals);
+	Commstime_locals_ctor(&(cp.locals));
 
 	
-	proc_ctor(&mproc, "Commstime", 0, &mproc_locals, Commstime_body);
+	proc_ctor((proc*) (&cp), "Commstime", 0, Commstime_body);
 
-	ret_val = Schedule_default( &(ctxt.s), &mproc); // TODO just exit?  assert: ctxt.num_ready == 0 if ret_val != 0
+	ret_val = Schedule_default( &(ctxt.s), (proc*) (&cp)); // TODO just exit?  assert: ctxt.num_ready == 0 if ret_val != 0
 	
 
 	ret_val = default_scheduler_run(&ctxt);
@@ -1271,7 +1275,6 @@ int main()
 	}
 
 	printf("Press <enter> to exit.\n");
-	//gets_s(buffer, BUFF_SIZE);
-	gets(buffer);
+	getchar();
 	return ret_val;
 }
