@@ -12,20 +12,20 @@
 // Duff's Device may work for simple cases, but becomes
 // unweildy rapidly and overly complicates code generation.
 #ifdef _MSC_VER
-#define saveState(state, label)				        \
-	do                                              \
-	{										        \
-		unsigned int tstate = 0xdeadbeef;	        \
-		__asm								        \
-		{									        \
-			__asm mov eax, offset label	            \
-			__asm mov tstate, eax			        \
-		}									        \
-		state = tstate;						        \
-label:                                              \	
-        /* bug? MSVC Express 2008 freaks out        \
-        if the last statement has a semi-colon */   \
-		__asm xor eax, eax					        \
+#define saveState(state, label)				            \
+	do                                                  \
+	{										            \
+		unsigned int tstate = 0xdeadbeef;	            \
+		__asm								            \
+		{									            \
+			__asm mov eax, offset label	                \
+			__asm mov tstate, eax			            \
+		}									            \
+		state = tstate;						            \
+label:                                                  \
+        /* bug? MSVC Express 2008 freaks out   */       \
+        /* if the last statement has a semi-colon */    \
+		__asm xor eax, eax					            \
 	} while (0)
 
 #elif __GNUC__
@@ -53,7 +53,7 @@ label:                                              \
     {									    \
 		unsigned int tstate = state;		\
         if(tstate != 0)                     \
-		    __asm jmp tstate       			\
+		    __asm jmp tstate      			\
 	} while (0)								
 
 #elif __GNUC__
