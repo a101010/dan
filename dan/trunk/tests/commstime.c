@@ -438,7 +438,7 @@ void Delta_body(proc * p, scheduler * s)
     // since we have an infinite loop above, we'll never get here
     // but this is where we'd set _PS_CLEAN_EXIT_ if we didn't
     // have an infinite loop
-    p->state == _PS_CLEAN_EXIT_;
+    p->state = _PS_CLEAN_EXIT_;
 EXIT:
     // if it is a real exit, clean up our channels
     // otherwise we're just blocked and returning to the scheduler
@@ -473,90 +473,82 @@ typedef struct Succ_locals_tag
 
 void Succ_body(proc * p, scheduler *s)
 {
-	int result;
+	int result = 0;
 	Succ_locals* locals = (Succ_locals*) p->locals;
-	int blocked = 0;
-	while(!blocked)
+    if(p->state != _PS_READY_TO_RUN_)
+        restoreState(p->state);
+	while(1)
 	{
-		switch(p->state)
+        saveState(p->state, Succ_S1);
+		
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_in]->chans, &(locals->value), &p->exception, p, s);
+		switch(result)
 		{
-		case _PS_READY_TO_RUN_:
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_in]->chans, &(locals->value), &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // read value
-				printf("Succ: read value %d\n", locals->value);
-				++(locals->value);
-				p->state = _PS_READY_TO_RUN_ + 1;
-				break;
-			case 1 : // blocked
-				// let it read again
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanRead_BInt_c_0 in Succ_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				p->exception = "unexpected result from ChanRead_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
+		case 0 : // read value
+			printf("Succ: read value %d\n", locals->value);
 			break;
-		case _PS_READY_TO_RUN_ + 1:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, locals->value, (void **) &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // wrote value
-				printf("Succ: wrote value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_;
-				break;
-			case 1 : // blocked
-				p->state = _PS_EXCEPTION_ + 2;
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Succ_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
+		case 1 : // blocked
+			// let it read again
+			goto EXIT;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
+		default:
+			printf("unexpected result from ChanRead_BInt_c_0 in Succ_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanRead_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+            goto EXIT;
+		}
+		++(locals->value);
+        
+		
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, locals->value, (void **) &p->exception, p, s);
+		switch(result)
+		{
+		case 0 : // wrote value
+			printf("Succ: wrote value %d\n", locals->value);
 			break;
-		case _PS_READY_TO_RUN_ + 2:
+		case 1 : // blocked
+			saveState(p->state, Succ_S2);
+            if(result == 1)
+                goto EXIT;
 			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
 				printf("Succ: wrote value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_;
 				break;
 			case 1 : // blocked
 				// let it try writing again
-				blocked = 1;
-				break;
+                goto EXIT;
 			case 2 : // exception
 				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
+				goto EXIT;
 			default:
 				printf("unexpected result from ChanWrite_BInt_c_0 in Succ_body: %d\n", result);
 				p->state = _PS_EXCEPTION_;
-				blocked = 1;
 				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+                goto EXIT;
 			}
 			break;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
 		default:
-			printf("Unsupported process state in Succ_body: %d\n", p->state);
-			p->exception = "Unsupported process state in Succ_body\n";
-			blocked = 1;
+			printf("unexpected result from ChanWrite_BInt_c_0 in Succ_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Succ_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+            goto EXIT;
 		}
-	}
+	} // while (1)
 
+    // since we have an infinite loop above, we'll never get here
+    // but this is where we'd set _PS_CLEAN_EXIT_ if we didn't
+    // have an infinite loop
+    p->state = _PS_CLEAN_EXIT_;
+EXIT:
+    // if it is a real exit, clean up our channels
+    // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
 		locals->__ends__[BUNDLE_END_Succ_in]->poison(locals->__ends__[BUNDLE_END_Succ_in]->chans, s);
