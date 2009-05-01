@@ -1,16 +1,20 @@
-struct proc_tag;
+//
+// list.h
+//
+// A doubly linked list
+//
 
 // doubly linked list of procs
-typedef struct proc_node_tag 
+typedef struct list_node_tag 
 {
-	struct proc_node_tag * up, * down;
-	struct proc_tag * p;
-} proc_node;
+	struct list_node_tag * up; 
+    struct list_node_tag * down;
+} list_node;
 
 // push n to the front of the list, n becomes (*head)
 // if (*head) is 0, n becomes (*head)
 // no effect if n == 0 or head == 0
-void pl_push_head(proc_node ** head, proc_node * n)
+void list_push_head(list_node ** head, list_node * n)
 {
 	if(0 == n || 0 == head)
 		return;
@@ -22,7 +26,7 @@ void pl_push_head(proc_node ** head, proc_node * n)
 	}
 	else
 	{
-		proc_node * tail = (*head)->up;
+		list_node * tail = (*head)->up;
 		(*head)->up = n;
 		n->down = (*head);
 		n->up = tail;
@@ -34,7 +38,7 @@ void pl_push_head(proc_node ** head, proc_node * n)
 // push n onto the back of the list
 // if (*head) is 0, n becomes (*head)
 // no effect if n == 0 or head == 0
-void pl_push_tail(proc_node ** head, proc_node * n)
+void list_push_tail(list_node ** head, list_node * n)
 {
 	if(0 == n || 0 == head)
 		return;
@@ -47,7 +51,7 @@ void pl_push_tail(proc_node ** head, proc_node * n)
 	}
 	else
 	{
-		proc_node * old_tail;
+		list_node * old_tail;
 		old_tail = (*head)->up;
 		(*head)->up = n;
 		n->up = old_tail;
@@ -60,9 +64,9 @@ void pl_push_tail(proc_node ** head, proc_node * n)
 // if only one node in the list, (*head) will == 0
 // no effect if head or (*head) == 0
 // returns: the head of the list or 0
-proc_node * pl_pop_head(proc_node ** head)
+list_node * list_pop_head(list_node ** head)
 {
-	proc_node * ret_val;
+	list_node * ret_val;
 
 	if(head == 0)
 		return 0;
@@ -92,9 +96,9 @@ proc_node * pl_pop_head(proc_node ** head)
 // if only one node in the list, (*head) will == 0
 // no effect if head or (*head) == 0
 // returns: the tail of the list or 0
-proc_node * pl_pop_tail(proc_node ** head)
+list_node * list_pop_tail(list_node ** head)
 {
-	proc_node * ret_val;
+	list_node * ret_val;
 
 	if(head == 0)
 		return 0;
@@ -119,9 +123,9 @@ proc_node * pl_pop_tail(proc_node ** head)
 	return ret_val;
 }
 
-proc_node * pl_remove(proc_node ** head, proc_node * n)
+list_node * list_remove(list_node ** head, list_node * n)
 {
-	proc_node * ret_val;
+	list_node * ret_val;
 
 	if(head == 0)
 		return 0;
