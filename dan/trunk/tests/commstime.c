@@ -728,119 +728,64 @@ typedef struct Count_locals_tag
 Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 {
 	locals->__ends__[BUNDLE_END_Count_in] = in;
-	locals->step = 5000;
+	locals->step = 1000;
 	return locals;
 }
 
 
 void Count_body(proc * p, scheduler * s)
 {
-	int result;
-	int blocked = 0;
+	int result = 0;
 	Count_locals * locals = p->locals;
+    if(p->state != _PS_READY_TO_RUN_)
+        restoreState(p->state);
+
 	printf("Count step: %d\n", locals->step);
-	while(!blocked)
+	while(1)
 	{
-		switch(p->state)
-		{
-		case _PS_READY_TO_RUN_ :
-			// initializing the loop
-			locals->i = 0;
-			// TODO use high-performance counters
-			time( &(locals->time1));
+		locals->i = 0;
+        // TODO use high-performance counters
+		time( &(locals->time1));
+        while(locals->i < locals->step)
+        {
+			saveState(p->state, Count_S1);
 			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // read value
 				printf("Count: read value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 2;
 				break;
 			case 1 : // blocked
-				p->state = _PS_READY_TO_RUN_ + 1;
-				blocked = 1;
-				break;
+				goto EXIT;
 			case 2 : // exception
 				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
+				goto EXIT;
 			default:
 				printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
 				p->state = _PS_EXCEPTION_;
 				p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-				blocked = 1;
+				goto EXIT;
 			}
-			break;
+            locals->i = locals->i + 1;
+        } // while(locals->i < locals->step)
 
-		case _PS_READY_TO_RUN_ + 1:
-			// when we are re-reading a channel
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // read value
-				printf("Count: read value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 2;
-				break;
-			case 1 : // blocked
-				// let it read again
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
-			break;
-		case _PS_READY_TO_RUN_ + 2:
-			// when we are incrementing i and checking the loop
-			if(locals->i >= locals->step)
-			{
-				time( &(locals->time2));
-				locals->time = (int32) (locals->time2 - locals->time1);	
-				printf("got %d iterations in %d seconds\n", locals->step, locals->time);
-				// TODO print traditional commstime stats
+		time( &(locals->time2));
+		locals->time = (int32) (locals->time2 - locals->time1);	
+		printf("got %d iterations in %d seconds\n", locals->step, locals->time);
+		// TODO print traditional commstime stats
 
-				// for now, just exit cleanly
-				p->state = _PS_CLEAN_EXIT_;
-				blocked = 1;
-				break;
+    	// for now, just exit cleanly
+		p->state = _PS_CLEAN_EXIT_;
+		goto EXIT;        
+	} // while (1)
 
-				// initialize the next iteration
-				//locals->i = 0;
-				//time( &(locals->time1));
-			}
-			++(locals->i);
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // read value
-				printf("Count: read value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 2;
-				break;
-			case 1 : // blocked
-				// let it read again
-				p->state = _PS_READY_TO_RUN_ + 1;
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanRead_BInt_c_0 in Count_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanRead_BInt_c_0 in Count_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-			}
-			break;
-		default:
-			printf("Unsupported process state in Count_body: %d\n", p->state);
-			p->exception = "Unsupported process state in Count_body\n";
-		}
-	}
-
+    // since we have an infinite loop above, we'll never get here
+    // but this is where we'd set _PS_CLEAN_EXIT_ if we didn't
+    // have an infinite loop
+    p->state = _PS_CLEAN_EXIT_;
+EXIT:
+    // if it is a real exit, clean up our channels
+    // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
 		locals->__ends__[BUNDLE_END_Count_in]->poison(locals->__ends__[BUNDLE_END_Count_in]->chans, s);
