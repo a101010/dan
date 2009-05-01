@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "list.h" 
+#include "SaveState.h"
 
 // spin locks are chatty no-ops right now  TODO use a flag for test and set rather than a string
 //#define lock(spinlock) printf("lock %s\n", spinlock);
@@ -331,133 +332,116 @@ typedef struct Delta_locals_tag
 
 void Delta_body(proc * p, scheduler * s)
 {
-	int result;
+	int result = 0;
 	Delta_locals* locals = (Delta_locals*) p->locals;
-	int blocked = 0; // blocked really just means 'return to the scheduler' here
-	while(!blocked)
+    if(p->state != _PS_READY_TO_RUN_)
+        restoreState(p->state);
+	while(1)
 	{
-		switch(p->state)
+        saveState(p->state, S1);
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_in]->chans, &(locals->value), &p->exception, p, s);
+		switch(result)
 		{
-		case _PS_READY_TO_RUN_:
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_in]->chans, &(locals->value), &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // read value
-				printf("Delta: read value %d\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 1;
-				break;
-			case 1 : // blocked
-				// let it read again
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanRead_BInt_c_0 in Delta_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanRead_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-				blocked = 1;
-			}
+		case 0 : // read value
+			printf("Delta: read value %d\n", locals->value);
 			break;
-		case _PS_READY_TO_RUN_ + 1:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, locals->value, (void**) &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // wrote value
-				printf("Delta: wrote value %d to out1\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 3;
-				break;
-			case 1 : // blocked
-				p->state = _PS_READY_TO_RUN_ + 2;
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-				blocked = 1;
-			}
-			break;
-		case _PS_READY_TO_RUN_ + 2:
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, (void **) &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // wrote value
-				printf("Delta: wrote value %d to out1\n", locals->value);
-				p->state = _PS_READY_TO_RUN_ + 3;
-				break;
-			case 1 : // blocked
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-				blocked = 1;
-			}
-			break;
-		case _PS_READY_TO_RUN_ + 3:
-			result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, locals->value, (void **) &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // wrote value
-				printf("Delta: wrote value %d to out2\n", locals->value);
-				p->state = _PS_READY_TO_RUN_;
-				break;
-			case 1 : // blocked
-				p->state = _PS_READY_TO_RUN_ + 4;
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-				blocked = 1;
-			}
-			break;
-		case _PS_READY_TO_RUN_ + 4:
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, (void **) &p->exception, p, s);
-			switch(result)
-			{
-			case 0 : // wrote value
-				printf("Delta: wrote value %d to out2\n", locals->value);
-				p->state = _PS_READY_TO_RUN_;
-				break;
-			case 1 : // blocked
-				blocked = 1;
-				break;
-			case 2 : // exception
-				p->state = _PS_EXCEPTION_;
-				blocked = 1;
-				break;
-			default:
-				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
-				p->state = _PS_EXCEPTION_;
-				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
-				blocked = 1;
-			}
-			break;
+		case 1 : // blocked
+			goto EXIT;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
 		default:
-			printf("Unsupported process state in Delta_body: %d\n", p->state);
-			p->exception = "Unsupported process state in Delta_body\n";
-			blocked = 1;
+			printf("unexpected result from ChanRead_BInt_c_0 in Delta_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanRead_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			goto EXIT;
 		}
-	}
 
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, locals->value, (void**) &p->exception, p, s);
+		switch(result)
+		{
+		case 0 : // wrote value
+			printf("Delta: wrote value %d to out1\n", locals->value);
+			break;
+		case 1 : // blocked
+            saveState(p->state, S2);
+            if(result == 1)
+                goto EXIT;
+            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, (void **) &p->exception, p, s);
+			switch(result)
+			{
+		    case 0 : // wrote value
+			    printf("Delta: wrote value %d to out1\n", locals->value);
+			    break;
+		    case 1 : // blocked
+			    goto EXIT;
+		    case 2 : // exception
+			    p->state = _PS_EXCEPTION_;
+			    goto EXIT;
+		    default:
+			    printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+			    p->state = _PS_EXCEPTION_;
+			    p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			    goto EXIT;
+			}
+			break;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
+		default:
+			printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			goto EXIT;
+		}
+		
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, locals->value, (void **) &p->exception, p, s);
+		switch(result)
+		{
+		case 0 : // wrote value
+			printf("Delta: wrote value %d to out2\n", locals->value);
+			p->state = _PS_READY_TO_RUN_;
+			break;
+		case 1 : // blocked
+			saveState(p->state, S3);
+            if(result == 1)
+                goto EXIT;
+            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, (void **) &p->exception, p, s);
+			switch(result)
+			{
+			case 0 : // wrote value
+				printf("Delta: wrote value %d to out2\n", locals->value);
+				break;
+			case 1 : // blocked
+				goto EXIT;
+			case 2 : // exception
+				p->state = _PS_EXCEPTION_;
+				goto EXIT;
+			default:
+				printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+				p->state = _PS_EXCEPTION_;
+				p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+				goto EXIT;
+			}
+			break;
+		case 2 : // exception
+			p->state = _PS_EXCEPTION_;
+			goto EXIT;
+		default:
+			printf("unexpected result from ChanWrite_BInt_c_0 in Delta_body: %d\n", result);
+			p->state = _PS_EXCEPTION_;
+			p->exception = "unexpected result from ChanWrite_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
+			goto EXIT;
+		}
+	} // while(1)
+
+    // since we have an infinite loop above, we'll never get here
+    // but this is where we'd set _PS_CLEAN_EXIT_ if we didn't
+    // have an infinite loop
+    p->state == _PS_CLEAN_EXIT_;
+EXIT:
+    // if it is a real exit, clean up our channels
+    // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
 		locals->__ends__[BUNDLE_END_Delta_in]->poison(locals->__ends__[BUNDLE_END_Delta_in]->chans, s);
