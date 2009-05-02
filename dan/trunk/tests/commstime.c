@@ -41,6 +41,22 @@ typedef void (*OpProcBody)(struct proc_tag * p, scheduler * s);
 #define _PS_CLEAN_EXIT_ 1
 #define _PS_READY_TO_RUN_ 2
 
+//TODO a typedef for the state type may ease porting to 64 bit
+char * proc_state_to_string(uint state)
+{
+    switch(state)
+    {
+    case _PS_EXCEPTION_:
+        return "EXCEPTION";
+    case _PS_CLEAN_EXIT_:
+        return "CLEAN_EXIT";
+    case _PS_READY_TO_RUN_:
+        return "READY_TO_RUN";
+    default:
+        return "RUNNING";
+    }
+}
+
 typedef enum sched_state_tag 
 {
 	_FREE_ = 0,
@@ -323,14 +339,12 @@ bundle_end * BInt_writer_end_ctor(bundle_end * wrEnd, BInt_chans * chans)
 	return wrEnd;
 }
 
-#define NUM_Delta_BUNDLE_ENDS 3
-#define BUNDLE_END_Delta_in 0
-#define BUNDLE_END_Delta_out1 1
-#define BUNDLE_END_Delta_out2 2
 typedef struct Delta_locals_tag
 {
 	int32       value;
-	bundle_end  *__ends__[3]; 
+	bundle_end  *in;
+    bundle_end  *out1;
+    bundle_end  *out2;
 } Delta_locals;
 
 typedef struct Delta_proc_tag
@@ -338,6 +352,15 @@ typedef struct Delta_proc_tag
     proc            p;
     Delta_locals    locals;
 } Delta_proc;
+
+// Delta_locals constructor
+Delta_locals * Delta_locals_ctor(Delta_locals * locals, bundle_end* in, bundle_end* out1, bundle_end* out2)
+{
+	locals->in = in;
+	locals->out1 = out1;
+	locals->out2 = out2;
+	return locals;
+}
 
 void Delta_body(proc * p, scheduler * s)
 {
@@ -349,7 +372,7 @@ void Delta_body(proc * p, scheduler * s)
 	while(1)
 	{
         saveState(p->state, Delta_S1);
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_in]->chans, &(locals->value), &p->exception, p, s);
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -367,7 +390,7 @@ void Delta_body(proc * p, scheduler * s)
 			goto EXIT;
 		}
 
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, locals->value, (void**) &p->exception, p, s);
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out1->chans, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -377,7 +400,7 @@ void Delta_body(proc * p, scheduler * s)
             saveState(p->state, Delta_S2);
             if(result == 1)
                 goto EXIT;
-            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out1]->chans, (void **) &p->exception, p, s);
+            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out1->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 		    case 0 : // wrote value
@@ -405,7 +428,7 @@ void Delta_body(proc * p, scheduler * s)
 			goto EXIT;
 		}
 		
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, locals->value, (void **) &p->exception, p, s);
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out2->chans, locals->value, (void **) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -416,7 +439,7 @@ void Delta_body(proc * p, scheduler * s)
 			saveState(p->state, Delta_S3);
             if(result == 1)
                 goto EXIT;
-            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Delta_out2]->chans, (void **) &p->exception, p, s);
+            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out2->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -454,29 +477,20 @@ EXIT:
     // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
-		locals->__ends__[BUNDLE_END_Delta_in]->poison(locals->__ends__[BUNDLE_END_Delta_in]->chans, s);
-		locals->__ends__[BUNDLE_END_Delta_out1]->poison(locals->__ends__[BUNDLE_END_Delta_out1]->chans, s);
-		locals->__ends__[BUNDLE_END_Delta_out2]->poison(locals->__ends__[BUNDLE_END_Delta_out2]->chans, s);
+        
+        printf("Delta: cleaning up self. Final state is %s\n", 
+            proc_state_to_string(p->state));
+		locals->in->poison(locals->in->chans, s);
+		locals->out1->poison(locals->out1->chans, s);
+		locals->out2->poison(locals->out2->chans, s);
 	}
 }
 
-
-// Delta_locals constructor
-Delta_locals * Delta_locals_ctor(Delta_locals * locals, bundle_end* in, bundle_end* out1, bundle_end* out2)
-{
-	locals->__ends__[BUNDLE_END_Delta_in] = in;
-	locals->__ends__[BUNDLE_END_Delta_out1] = out1;
-	locals->__ends__[BUNDLE_END_Delta_out2] = out2;
-	return locals;
-}
-
-#define NUM_Succ_BUNDLE_ENDS 2
-#define BUNDLE_END_Succ_in 0
-#define BUNDLE_END_Succ_out 1
 typedef struct Succ_locals_tag
 {
 	int32 value;
-	bundle_end * __ends__[NUM_Succ_BUNDLE_ENDS];
+	bundle_end *in;
+    bundle_end *out;
 } Succ_locals;
 
 typedef struct Succ_proc_tag
@@ -484,6 +498,14 @@ typedef struct Succ_proc_tag
     proc        p;
     Succ_locals locals;
 } Succ_proc;
+
+// Succ_locals constructor
+Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end* in, bundle_end* out)
+{
+	locals->in = in;
+	locals->out = out;
+	return locals;
+}
 
 void Succ_body(proc * p, scheduler *s)
 {
@@ -496,7 +518,7 @@ void Succ_body(proc * p, scheduler *s)
 	{
         saveState(p->state, Succ_S1);
 		
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_in]->chans, &(locals->value), &p->exception, p, s);
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -517,7 +539,7 @@ void Succ_body(proc * p, scheduler *s)
 		++(locals->value);
         
 		
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, locals->value, (void **) &p->exception, p, s);
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out->chans, locals->value, (void **) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -527,7 +549,7 @@ void Succ_body(proc * p, scheduler *s)
 			saveState(p->state, Succ_S2);
             if(result == 1)
                 goto EXIT;
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Succ_out]->chans, (void **) &p->exception, p, s);
+			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out->chans, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -566,29 +588,19 @@ EXIT:
     // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
-		locals->__ends__[BUNDLE_END_Succ_in]->poison(locals->__ends__[BUNDLE_END_Succ_in]->chans, s);
-		locals->__ends__[BUNDLE_END_Succ_out]->poison(locals->__ends__[BUNDLE_END_Succ_out]->chans, s);
+        printf("Succ: cleaning up self. Final state is %s\n", 
+            proc_state_to_string(p->state));
+		locals->in->poison(locals->in->chans, s);
+		locals->out->poison(locals->out->chans, s);
 	}
 }
 
 
-
-// Succ_locals constructor
-Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end* in, bundle_end* out)
-{
-	locals->__ends__[BUNDLE_END_Succ_in] = in;
-	locals->__ends__[BUNDLE_END_Succ_out] = out;
-	return locals;
-}
-
-
-#define NUM_Prefix_BUNDLE_ENDS 2
-#define BUNDLE_END_Prefix_in 0
-#define BUNDLE_END_Prefix_out 1
 typedef struct Prefix_locals_tag
 {
 	int32 value;
-	bundle_end * __ends__[NUM_Prefix_BUNDLE_ENDS]; 
+	bundle_end *in;
+    bundle_end *out;
 } Prefix_locals;
 
 typedef struct Prefix_proc_tag
@@ -600,8 +612,8 @@ typedef struct Prefix_proc_tag
 // Prefix_locals constructor
 Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bundle_end * out, int32 initValue)
 {
-	locals->__ends__[BUNDLE_END_Prefix_in] = in;
-	locals->__ends__[BUNDLE_END_Prefix_out] = out;
+	locals->in = in;
+	locals->out = out;
 	locals->value = initValue;
 	return locals;
 }
@@ -616,9 +628,7 @@ void Prefix_body(proc * p, scheduler * s)
         restoreState(p->state);
 
     printf("Prefix init value: %d\n", locals->value); 
-	// TODO if we have to cast the op function pointer this specificially, is there any value in passing the op pointer?  Probably not.
-	//(ChanWrite_BInt_c_0) locals->__ends__[BUNDLE_END_Prefix_out]->ops;
-	result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &(p->exception), p, s); 
+	result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out->chans, locals->value, (void **) &(p->exception), p, s); 
 	switch(result)
 	{
 	case 0: // wrote value and synced
@@ -628,7 +638,7 @@ void Prefix_body(proc * p, scheduler * s)
         saveState(p->state, Prefix_S1);
         if(result == 1)
             goto EXIT;
-		result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, (void **) &(p->exception), p, s); 
+		result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out->chans, (void **) &(p->exception), p, s); 
 		switch(result)
 		{
 		case 0: // wrote value and synced
@@ -659,7 +669,7 @@ void Prefix_body(proc * p, scheduler * s)
 	while(1)
 	{
         saveState(p->state, Prefix_S2);
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_in]->chans, &(locals->value), &p->exception, p, s);
+		result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -678,7 +688,7 @@ void Prefix_body(proc * p, scheduler * s)
             goto EXIT;
 		}
 		
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, locals->value, (void **) &p->exception, p, s);
+		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out->chans, locals->value, (void **) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -688,7 +698,7 @@ void Prefix_body(proc * p, scheduler * s)
             saveState(p->state, Prefix_S3);
             if(result == 1)
                 goto EXIT;
-		    result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Prefix_out]->chans, (void **) &(p->exception), p, s); 
+		    result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out->chans, (void **) &(p->exception), p, s); 
 		    switch(result)
 		    {
 		    case 0: // wrote value and synced
@@ -726,15 +736,14 @@ EXIT:
     // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
-		locals->__ends__[BUNDLE_END_Prefix_in]->poison(locals->__ends__[BUNDLE_END_Prefix_in]->chans, s);
-		locals->__ends__[BUNDLE_END_Prefix_out]->poison(locals->__ends__[BUNDLE_END_Prefix_out]->chans, s);
+        printf("Prefix: cleaning up self. Final state is %s\n", 
+            proc_state_to_string(p->state));
+		locals->in->poison(locals->in->chans, s);
+		locals->out->poison(locals->out->chans, s);
 	}
 }
 
 
-#define NUM_Count_BUNDLE_ENDS 1
-#define BUNDLE_END_Count_in 0
-#define _COUNT_STEP_ 100000
 typedef struct Count_locals_tag
 {
 	int32 value;
@@ -743,7 +752,7 @@ typedef struct Count_locals_tag
 	int32 time;
 	time_t time1;
 	time_t time2;
-	bundle_end * __ends__[NUM_Count_BUNDLE_ENDS];
+	bundle_end *in;
 } Count_locals;
 
 typedef struct Count_proc_tag
@@ -755,7 +764,7 @@ typedef struct Count_proc_tag
 // Count_locals constructor
 Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
 {
-	locals->__ends__[BUNDLE_END_Count_in] = in;
+	locals->in = in;
 	locals->step = 1000;
 	return locals;
 }
@@ -778,7 +787,7 @@ void Count_body(proc * p, scheduler * s)
         while(locals->i < locals->step)
         {
 			saveState(p->state, Count_S1);
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->__ends__[BUNDLE_END_Count_in]->chans, &(locals->value), &p->exception, p, s);
+			result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // read value
@@ -817,7 +826,9 @@ EXIT:
     // otherwise we're just blocked and returning to the scheduler
 	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
 	{
-		locals->__ends__[BUNDLE_END_Count_in]->poison(locals->__ends__[BUNDLE_END_Count_in]->chans, s);
+        printf("Count: cleaning up self. Final state is %s\n", 
+            proc_state_to_string(p->state));
+		locals->in->poison(locals->in->chans, s);
 	}
 }
 
@@ -1009,6 +1020,7 @@ void Commstime_body(proc * p, scheduler * s)
 
     p->state = _PS_CLEAN_EXIT_;
 EXIT:
+    // No cleanup needed here
     return;
 
 }
@@ -1148,14 +1160,14 @@ void default_scheduler_ctor(Scheduler_default * ctxt)
 //int default_scheduler_finish_proc(Scheduler_default * ctxt, proc * p)
 int default_scheduler_finish_proc(proc * p)
 {
-	printf("cleaning up process %s\n", p->proc_name);
+    printf("scheduler: cleaning up process %s\n", p->proc_name);
 	p->sched_state = _FINISHED_;
 	return 0;
 }
 
 void default_scheduler_block_proc(Scheduler_default * ctxt, proc * p)
 {
-	printf("blocking process %s\n", p->proc_name);
+    printf("scheduler: blocking process %s\n", p->proc_name);
 	lock(p->spinlock);
 	p->sched_state = _BLOCKED_;
 	unlock(p->spinlock);
@@ -1182,7 +1194,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 		p->sched_state = _RUNNING_;
 		unlock(p->spinlock);
 
-		printf("running process %s\n", p->proc_name);
+        printf("scheduler: running process %s\n", p->proc_name);
 		p->body(p, &(ctxt->s));
 
 
@@ -1200,7 +1212,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 			// if there is a parent, schedule it so it has a chance to handle the exception
 			if(p->parent != 0)
 			{
-				printf("first chance exception from %s: %s\n", p->proc_name, p->exception);
+                printf("scheduler: first chance exception from %s: %s\n", p->proc_name, p->exception);
 				if(0 != (ret_val = Schedule_default( &(ctxt->s), p->parent)))
 				{
 					printf("Fatal error from Schedule_default while trying to schedule parent %s of proc %s with unhandled exception\n", p->parent, p);
@@ -1209,7 +1221,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 			}
 			else
 			{
-				printf("Unhandled exception from %s: %s\n", p->proc_name, p->exception);
+                printf("scheduler: Unhandled exception from %s: %s\n", p->proc_name, p->exception);
 				return 1;
 			}
 		}
@@ -1227,7 +1239,7 @@ int default_scheduler_run(Scheduler_default * ctxt)
 			{
 				if(0 != (ret_val = Schedule_default( &(ctxt->s), p->parent)))
 				{
-					printf("Fatal error from Schedule_default while trying to schedule parent %s of exiting proc %s\n", p->parent, p);
+                    printf("scheduler: Fatal error from Schedule_default while trying to schedule parent %s of exiting proc %s\n", p->parent, p);
 					return ret_val;
 				}
 			}
