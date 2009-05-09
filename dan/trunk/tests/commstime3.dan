@@ -7,15 +7,14 @@
 // bundle end extraction operator, making the ends of the bundle members of the bundle.
 
 import GetTimeNano from Time;
-import Nerk;
 
 bundle BInt
 {
-	channel int32 c ->;
+	channel(0)<int32> c ->;
 	// eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
 }
 
-proc void Delta(BInt.Read in, BInt.Write out1, BInt.Write out2)
+proc void Delta(static BInt.Read in, static BInt.Write out1, static BInt.Write out2)
 {
 	int32 value;
 	while (true)
@@ -26,7 +25,7 @@ proc void Delta(BInt.Read in, BInt.Write out1, BInt.Write out2)
 	}
 }
 			
-proc void Succ(BInt.Read in, BInt.Write out)
+proc void Succ(static BInt.Read in, static BInt.Write out)
 {
 	int32 value;
 	while (true)
@@ -36,7 +35,7 @@ proc void Succ(BInt.Read in, BInt.Write out)
 	}
 }
 		
-proc void Prefix(BInt.Read in, BInt.Write out, int32 initValue)
+proc void Prefix(static BInt.Read in, static BInt.Write out, int32 initValue)
 {
 	int32 value = initValue;
 	out.c ! value;
@@ -47,7 +46,7 @@ proc void Prefix(BInt.Read in, BInt.Write out, int32 initValue)
 	}
 }
 
-proc void Count(BInt.Read in)
+proc void Count(static BInt.Read in)
 {
 	int32 value;
 	int32 step = 100000;
@@ -80,9 +79,22 @@ proc void Count(BInt.Read in)
 [main]
 proc void Commstime()
 {
-	BInt a, b, c, d;
+    // Statically allocated bundles are allocated in the locals
+    // space of the proc.
+	static BInt a = new(static) BInt();
+	static BInt b = new(static) BInt();
+	static BInt c = new(static) BInt();
+	static BInt d = new(static) BInt();
 	par
 	{
+        // For static bundles, the entire bundle end must be
+        // passed to other processes.  Individual channels may not
+        // be passed separately.
+        // In addition, bundle ends may only be passed to procs that are
+        // gauranteed to complete before the allocating proc.
+        // This means they must be in a par, and must declare
+        // the bundle end static in their parameter list.
+        // (These rules will also apply to statically allocated Mobile types)
 		Prefix(d.Read, a.Write);
 		Delta(a.Read, b.Write, c.Write);
 		Succ(c.Read, d.Write);
