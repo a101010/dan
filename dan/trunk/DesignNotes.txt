@@ -72,16 +72,44 @@ High Level Requirements
           last channel end is freed.  They have no external interface except their ends.
             - SychronousChannel: The writer blocks until the channel has been read.
               Has no buffer.
+              
+                channel or channel(0)
+              
             - NChannel: has N slots and blocks when full.
+            
+                channel(N) 
+            
             - UnboundedChannel: can grow to the limits of memory.
+            
+                channel(unbounded)
+            
             - OverflowingChannel: has N slots, and looses additional messages when full.
+            
+                channel(N, overflow)
+            
             - OverwritingChannel: has N slots, and looses the oldest message when full.
+            
+                channel(N, overwrite)
+            
             - PriorityChannel: highest priority message is read first, unbounded.
+            
+                channel(unbounded, priority)
+            
             - NPriorityChannel: as PriorityChannel, but N-slot.  Low priority are discarded
               when full.
+              
+                channel(N, priority)
+              
+            The number of slots is for a complete protocol sequence.  Priority channels
+            have a protocol of <someUnsignedIntType>, <someOtherProtocolSequence>.  
+            Highest priority is lowest value; 0 is highest priority.
+            
         - ChannelReader: Can read from or poison a channel.
         - ChannelWriter: Can write to or poison a channel.
         - Bundle: groups related channels.  Can have a protocol that spans the bundle.
+          (TODO, need to decide how to do buffer sizes for bundle protocols.  I imagine
+          we'll either specify for each channel in the bundle protocol or in the protocol
+          itself)
         - BundleEnd: holds the channel ends of a bundle.
         - Exception: as usual, but may possibly be a subclass of Message
         - MobileObject: arbitrary objects that may have internal structure.  They may have 
