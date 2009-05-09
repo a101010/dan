@@ -10,7 +10,7 @@ import GetTimeNano from Time;
 
 bundle BInt
 {
-	channel(0)<int32> c ->;
+	channel<int32>(0) c ->;
 	// eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
 }
 

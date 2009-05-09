@@ -41,6 +41,18 @@ High Level Requirements
     - Object: There may be at least a conceptual unifying 'Object' class, but it cannot be 
       directly inherited from.  May be a type object for it that provides default ToString etc.
         - Primitives: value types: integers, floats, bools, bytes.
+        - Pointers: procs that use must be marked unsafe. 
+            ptr<type>
+            addressOf operator
+            address operator
+            E.g.
+                MyType a = new MyType();
+                ptr<MyType> b = addressOf(a);
+                MyType c = b.value;
+                ptr<byte> d = address(0xfaa7beef);
+                d = d + 2;
+                (d + 2).value = 0xaa;
+            Hopefully pointers will not be needed very often.
         - Enums: value types based on an integer type. 
         - Proc: a process or proceedure
           May not be inherited.
@@ -73,44 +85,98 @@ High Level Requirements
             - SychronousChannel: The writer blocks until the channel has been read.
               Has no buffer.
               
-                channel or channel(0)
+                channel<protocol>() or channel<protocol>(0) or channel<protocol>(0, block)
               
             - NChannel: has N slots and blocks when full.
             
-                channel(N) 
+                channel<protocol>(N) or channel<protocol>(N, block)
             
             - UnboundedChannel: can grow to the limits of memory.
             
-                channel(unbounded)
+                channel<protocol>(unbounded)
             
             - OverflowingChannel: has N slots, and looses additional messages when full.
             
-                channel(N, overflow)
+                channel<protocol>(N, overflow)
             
             - OverwritingChannel: has N slots, and looses the oldest message when full.
             
-                channel(N, overwrite)
+                channel<protocol>(N, overwrite)
             
             - PriorityChannel: highest priority message is read first, unbounded.
             
-                channel(unbounded, priority)
+                channel<protocol>(unbounded, priority)
             
             - NPriorityChannel: as PriorityChannel, but N-slot.  Low priority are discarded
               when full.
               
-                channel(N, priority)
+                channel<protocol>(N, priority)
               
             The number of slots is for a complete protocol sequence.  Priority channels
             have a protocol of <someUnsignedIntType>, <someOtherProtocolSequence>.  
             Highest priority is lowest value; 0 is highest priority.
             
-        - ChannelReader: Can read from or poison a channel.
-        - ChannelWriter: Can write to or poison a channel.
+            These look like constructors, but they choose the channel behavior at 
+            compile time, not run time.  The second parameter is a channel behavior.
+            Eventually I'd like to support user defined channel behaviors.  For v1.0
+            they are keywords, as is 'unbounded'.
+            
+            They are not used as constructors in channel bundle declarations.
+            See below.
+            
+        - ChannelReader: Can read from or poison a channel. chanr<protocol>
+        - ChannelWriter: Can write to or poison a channel.  chanw<protocol>
+        
+            E.g.
+                channel<int32> a = new(local) channel<int32>(4, overflow);
+                chanr b = a.Read;
+                chanw c = a.Write;
+        
         - Bundle: groups related channels.  Can have a protocol that spans the bundle.
           (TODO, need to decide how to do buffer sizes for bundle protocols.  I imagine
           we'll either specify for each channel in the bundle protocol or in the protocol
-          itself)
-        - BundleEnd: holds the channel ends of a bundle.
+          itself)  Bundle protocols should be sophisticated enough to support things like
+          sliding window protocols. Should be able to do the TCP state machine as a 
+          bundle protocol.
+          A bundle type declaration consists of an optional constructor (which has no body,
+          it is a way to pass size parameters to channel declarations and to the 
+          bundle protocol), channel declarations, and an optional bundle protocol.
+          Channel declarations are of one of two forms:
+            channel <name> <dirspec>;
+            channel<<protocol>>(N, <behavior>) <name> <dirspec>;
+          The first form indicates the channel participates in the bundle protocol.
+          The second is an independent channel with its own protocol, and may
+          be any of the forms listed in the channels section above.
+          
+          dirspec: -> | <- 
+            represents the direction of the channel releative to the bundle
+            A channel with dirspec '->' has its read end in the read end of the
+            bundle; one with dirspec '<-' has the read end in the write end of
+            the bundle.
+          
+          
+          E.g.
+            Bundle MyBundleType
+            {
+                MyBundleType(int bufferSize);
+            
+                channel<MyChannelProtocl>(bufferSize, overwrite) a ->;
+                channel<int32>(bufferSize, overwrite) b <-;
+                channel c ->;
+                channel d <-;
+               
+                protocol { TODO }
+            }
+          
+        - BundleEnd: holds the channel ends of a bundle. 
+            To refer to the type of the end: <BundleType>.<Reader/Writer>
+            To refer to the ends:  <bundle>.<Read/Write>
+            E.g.
+                Bundle MyBundleType {...}
+                ...
+                MyBundleType a = new MyBundleType();
+                MyBundleType.Reader b = a.Read;
+                MyBundleType.Writer c = a.Write;
         - Exception: as usual, but may possibly be a subclass of Message
         - MobileObject: arbitrary objects that may have internal structure.  They may have 
           either 'mobile' or 'local' references to other mobile types.  A 'mobile' ref is 
