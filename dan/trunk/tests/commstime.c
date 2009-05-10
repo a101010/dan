@@ -114,58 +114,183 @@ void proc_ctor(proc * p, char * proc_name, proc * parent, /* void * locals,*/ Op
 
 
 typedef void (*OpPoison)(void * chans, scheduler * s);
-typedef int (*OpIsPoisoned)(void * chans); 
+typedef int (*OpIsPoisoned)(void * chans);
+// TODO this will not be a C null-terminated string; but we still need to 
+// introduce dynamic allocation
+typedef char* (*OpToString)(void * chans);
 
-// TODO need seperate read/write end structures for each channel in the bundle
-// TODO bundle ends should be mobile by default, but have to develop the idea of a moble reference type in more detail first
-typedef struct bundle_end_tag
+struct Channel_int32_tag;
+
+typedef struct ChanR_int32_Type_tag
 {
-	OpPoison poison; // (public) the poison and isPoisoned ops apply to the entire bundle 
-	OpIsPoisoned isPoisoned; // public
-	// it turns out that ops cannot be used in a type independent manner, so there is no value in including it	
-	// void * ops; // (public) this is an array of ops, by channel index; each op structure includes poision isPoisoned, and either read or write for each channel
-	void * chans;  // (private) pointer to the channels backing store structure
-} bundle_end;
+    OpPoison poison;
+    OpIsPoisoned isPoisoned;
+    OpToString toString;
+    // TODO add other Object type methods
+} ChanR_int32_Type;
 
 
-// returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
-//typedef int (*OpChanRead_BInt_c_0)(BInt_chans * chans, int32 * value, char ** ex, proc * p, scheduler * s);
+typedef int (*OpChanRead_int32)(struct Channel_int32_tag* channel, 
+                                int32 * value, 
+                                char ** exception, 
+                                proc * p, 
+                                scheduler * s);
 
-
-
-// returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
-//typedef int (*OpChanWrite_BInt_c_0)(BInt_chans * chans, int32 value, void ** exception, proc * p, scheduler * s);
-
-
-
-
-// channels backing store for BInt channel bundle
-typedef struct BInt_chans_tag
+// this is chanr<int32>
+typedef struct ChanR_int32_tag
 {
+    OpChanRead_int32            read;
+    struct Channel_int32_tag    *channel;
+    ChanR_int32_Type            *type;
+} ChanR_int32;
+
+// TODO evaluate whether we need both read and write end types
+typedef struct ChanW_int32_Type_tag
+{
+    OpPoison poison;
+    OpIsPoisoned isPoisoned;
+    OpToString toString;
+    // TODO add other Object type methods
+} ChanW_int32_Type_tag;
+
+typedef int (*OpChanWrite_int32)(struct Channel_int32_tag* channel, 
+                                 int32 value, 
+                                 void ** exception, 
+                                 proc * p, 
+                                 scheduler * s);
+
+// TODO see if we can get rid of this one
+typedef int (*OpChanWriteHandshake_int32)(struct Channel_int32_tag* channel, 
+                                 int32 value, 
+                                 void ** exception, 
+                                 proc * p, 
+                                 scheduler * s);
+
+// this is chanw<int32>
+typedef struct ChanW_int32_tag
+{
+    OpChanWrite_int32            write;
+    OpChanWriteHandshake_int32   writeHandshake;
+    struct Channel_int32_tag    *channel;
+    ChanW_int32_Type            *type;
+} ChanW_int32;
+
+// This may be called Channel, but is is really storage for the 
+// channel ends.  It is the first member of the final channel type,
+// so that a pointer to one is a pointer to the other.
+// It is an abstract type that other clients may not subclass.
+typedef struct Channel_int32_tag 
+{
+    // the ends are mobile types; these pointers are their initial home
+    ChanR_int32     *read;
+    ChanW_int32     *write;
+    // but this is where their storage is allocated
+    ChanR_int32     readStore;
+    ChanW_int32     writeStore;
+} Channel_int32;
+
+static struct Channel_int32_0_blocking_type_tag
+{
+    // TODO may also need a lock
+    int initialized = 0;
+    ChanR_int32_Type reader;
+    ChanW_int32_Type writer;
+} Channel_int32_0_blocking_type;
+
+Channel_int32_0_blocking_type_init()
+{
+    struct Channel_int32_0_blocking_type_tag *type =
+        &Channel_int32_0_blocking_type;
+    if(0 == type->initialized)
+    {
+        // TODO can factor out everything but the toString operations if we want
+        type->reader.readStore.poison = Channel_int32_0_blocking_OpPoison;
+        type->reader.readStore.isPoisoned = Channel_int32_0_blocking_OpIsPoisoned;
+        type->reader.readStore.toString = Channel_int32_0_blocking_ChanR_OpToString;
+        type->writer.writeStore.poison = Channel_int32_0_blocking_OpPoison;
+        type->writer.writeStore.isPoisoned = Channel_int32_0_blocking_OpIsPoisoned;
+        type->writer.writeStore.toString = Channel_int32_0_blocking_ChanW_OpToString;
+        type->initialied = 1;
+    }
+}
+
+// this is channel<int32>(0, blocking)
+typedef struct Channel_int32_0_blocking_tag
+{
+    Channel_int32   ends;
 	int is_poisoned; // 0 = false, 1 = true
-	int32 c_value; // will be a union if multiple types on the channel
-	unsigned int c_valid_value; // 0 if invalid, else the number of the type for the value of c that is valid (a channel can carry multiple types) but in this case 1 is int32
+	int32 value; // will be a union if multiple types on the channel (and need a type tag in that case)
+	unsigned int valid_value; // 0 if invalid, else the number of the type for the value of c that is valid (a channel can carry multiple types) but in this case 1 is int32
 	proc * reader_waiting; // reader waiting to syncronize on the channel
 	proc * writer_waiting; // writer waiting to syncronize on the channel
+} Channel_int32_0_blocking;
 
-} BInt_chans;
+Channel_int32_0_blocking * Channel_int32_0_blocking_ctor(Channel_int32_0_blocking_ctor * channel)
+{
+    Channel_int32_0_blocking_type_init();
+    channel->ends.readStore.read = Channel_int32_0_blocking_OpRead;
+    channel->ends.readStore.channel = (Channel_int32*) channel;
+    channel->ends.readStore.type = &(Channel_int32_0_blocking_type.reader);
+    channel->ends.writeStore.write = Channel_int32_0_blocking_OpWrite;
+    channel->ends.writeStore.writeHandshake = Channel_int32_0_blocking_OpWriteHandshake;
+    channel->ends.writeStore.channel = (Channel_int32*) channel;
+    channel->ends.writeStore.type = &Channel_int32_0_blocking_type.writer);
+    channel->ends.read = &readStore;
+    channel->ends.write = &writeStore;
+    channel->is_poisoned = 0;
+    channel->valid_value = 0;
+    channel->reader_waiting = 0;
+    channel->writer_waiting = 0;
+}
+
+typedef struct BundleR_BInt_tag
+{
+    ChanR_int32 *c;
+} BundleR_BInt;
+
+typedef struct BundleW_BInt_tag
+{
+    ChanW_int32 *c;
+} BundleW_BInt;
+
+// backing store for BInt channel bundle
+typedef struct Bundle_BInt_tag
+{
+    BundleR_BInt                *read;
+    BundleW_BInt                *write;
+    BundleR_BInt                readStore;
+    BundleW_BInt                writeStore;
+    Channel_int32_0_blocking    c;
+} Bundle_BInt;
 
 // BInt_chans constructor
 BInt_chans * BInt_chans_ctor(BInt_chans * chans)
 {
+    // Bundle reader end and associated channel ends
+    chans->reader = &(chans->reader_c);
+    chans->reader_c = chans;
+
+    // Bundle writer end and associated channel ends
+    chans->writer = &(chans->writer_c);
+    chans->writer_c = chans;
+
+    // apply to all channels in bundle
 	chans->is_poisoned = 0;
+
+    // channel c
+    chans->c_value = 0;
 	chans->c_valid_value = 0;
-	chans->c_valid_value = 0;
-	// TODO need reader waiting and writer waiting for each channel
-	chans->reader_waiting = 0; 
-	chans->writer_waiting = 0;
+	chans->c_reader_waiting = 0; 
+	chans->c_writer_waiting = 0;
+
 	return chans;
 }
 
 // there doesn't seem to be any general way to do channel read and write ops
 // returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
-int ChanRead_BInt_c_0(BInt_chans * chans, int32 * value, char ** exception, proc * p, scheduler * s)
+int ChanRead_BInt_c_0(BInt_c_Reader reader, int32 * value, char ** exception, proc * p, scheduler * s)
 {
+    BInt_chans * chans = (BInt_chans*) reader;
 	int ret_val = 2;
 	// TODO get the lock
 	if(chans->is_poisoned)
@@ -178,16 +303,16 @@ int ChanRead_BInt_c_0(BInt_chans * chans, int32 * value, char ** exception, proc
 		{
 			*value = chans->c_value;
 			chans->c_valid_value = 0;
-			if(chans->writer_waiting != 0)
+			if(chans->c_writer_waiting != 0)
 			{
-				s->schedule(s, chans->writer_waiting);
-				chans->writer_waiting = 0;
+				s->schedule(s, chans->c_writer_waiting);
+				chans->c_writer_waiting = 0;
 			}
 			ret_val = 0;
 		}
 		else
 		{
-			chans->reader_waiting = p;
+			chans->c_reader_waiting = p;
 			ret_val = 1;
 		}
 	}
@@ -199,8 +324,9 @@ int ChanRead_BInt_c_0(BInt_chans * chans, int32 * value, char ** exception, proc
 
 // there doesn't seem to be any general way to do channel read and write ops
 // returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
-int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc * p, scheduler * s)
+int ChanWrite_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception, proc * p, scheduler * s)
 {
+    BInt_chans * chans = (BInt_chans*) writer;
 	int ret_val = 2;
 	// TODO get the lock
 	if(chans->is_poisoned)
@@ -213,15 +339,15 @@ int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc 
 		// TODO right now the writer allways unconditionally writes; allow to withdraw if in ALT
 		chans->c_value = value;
 		chans->c_valid_value = 1;
-		if(chans->reader_waiting != 0)
+		if(chans->c_reader_waiting != 0)
 		{
-			s->schedule(s, chans->reader_waiting);
-			chans->reader_waiting = 0;
+			s->schedule(s, chans->c_reader_waiting);
+			chans->c_reader_waiting = 0;
 			ret_val = 0;
 		}
 		else
 		{
-			chans->writer_waiting = p;
+			chans->c_writer_waiting = p;
 			ret_val = 1;
 		}
 		
@@ -232,8 +358,9 @@ int ChanWrite_BInt_c_0(BInt_chans * chans, int32 value, void ** exception, proc 
 }
 
 // In this case the value has already been written, we're just checking to make sure it has been read
-int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, scheduler * s)
+int ChanWriteSync_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception, proc * p, scheduler * s)
 {
+    BInt_chans * chans = (BInt_chans*) writer;
 	int ret_val = 2;
 	// TODO get the lock
 	if(chans->is_poisoned)
@@ -243,10 +370,10 @@ int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, sche
 	}
 	else
 	{
-		if(chans->reader_waiting != 0)
+		if(chans->c_reader_waiting != 0)
 		{
-			s->schedule(s, chans->reader_waiting);
-			chans->reader_waiting = 0;
+			s->schedule(s, chans->c_reader_waiting);
+			chans->c_reader_waiting = 0;
 			ret_val = 0;
 		}
 		else
@@ -257,7 +384,7 @@ int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, sche
 			}
 			else
 			{
-				chans->writer_waiting = p;
+				chans->c_writer_waiting = p;
 				ret_val = 1;
 			}
 		}
@@ -267,35 +394,32 @@ int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, sche
 	return ret_val;
 }
 
-// the need for an implementation of Poison and IsPoisoned for each bundle type
-// can probably be simplified by another layer of indirection, but is it worth it?
+// TODO need to get locks for poison operations 
+// (for _reader_waiting and _writer_waiting, and to prevent reads and writes during the poison operation)
 
-// TODO the poison operation must check each reader_waiting and writer_waiting for all channels
-// TODO need to get locks for poison operations
+typedef BInt_chans* BInt_channel_end;
 
-void Poison_BInt_writer(void * chans, scheduler * s)
+void Poison_BInt_writer(BInt_channel_end end, scheduler * s)
 {
-	((BInt_chans*)chans)->is_poisoned = 1;
-	if( 0 != ((BInt_chans*)chans)->reader_waiting)
+    BInt_chans* chans = (BInt_chans*) end;
+	chans->is_poisoned = 1;
+	if( 0 != chans->c_reader_waiting)
 	{
-		s->schedule(s, ((BInt_chans*)chans)->reader_waiting);
-		((BInt_chans*)chans)->reader_waiting = 0;
+		s->schedule(s, chans->c_reader_waiting);
+		chans->c_reader_waiting = 0;
+	}
+    if( 0 != chans->c_writer_waiting)
+	{
+		s->schedule(s, chans->c_writer_waiting);
+		chans->c_writer_waiting = 0;
 	}
 }
 
-void Poison_BInt_reader(void * chans, scheduler * s)
-{
-	((BInt_chans*)chans)->is_poisoned = 1;
-	if( 0 != ((BInt_chans*)chans)->writer_waiting)
-	{
-		s->schedule(s, ((BInt_chans*)chans)->writer_waiting);
-		((BInt_chans*)chans)->writer_waiting = 0;
-	}
-}
 
-int IsPoisoned_BInt(void * chans)
+int IsPoisoned_BInt(BInt_channel_end end)
 {
-	return ((BInt_chans*)chans)->is_poisoned;
+    BInt_chans* chans = (BInt_chans*) end;
+	return chans->is_poisoned;
 }
 
 // may not need; bundle_end may be sufficient
@@ -320,31 +444,12 @@ int IsPoisoned_BInt(void * chans)
 //	BInt_chans * chans; // private
 //} BInt_c_writer_0;
 
-
-// BInt reader end constructor
-bundle_end * BInt_reader_end_ctor(bundle_end * rEnd, BInt_chans * chans)
-{
-	rEnd->chans = chans;
-	rEnd->isPoisoned = IsPoisoned_BInt;
-	rEnd->poison = Poison_BInt_reader;
-	return rEnd;
-}
-
-// BInt writer end constructor TODO only need one bundle end constructor?
-bundle_end * BInt_writer_end_ctor(bundle_end * wrEnd, BInt_chans * chans)
-{
-	wrEnd->chans = chans;
-	wrEnd->isPoisoned = IsPoisoned_BInt;
-	wrEnd->poison = Poison_BInt_writer;
-	return wrEnd;
-}
-
 typedef struct Delta_locals_tag
 {
 	int32       value;
-	bundle_end  *in;
-    bundle_end  *out1;
-    bundle_end  *out2;
+	BInt_reader in;
+    BInt_writer out1;
+    BInt_writer out2;
 } Delta_locals;
 
 typedef struct Delta_proc_tag
@@ -354,7 +459,7 @@ typedef struct Delta_proc_tag
 } Delta_proc;
 
 // Delta_locals constructor
-Delta_locals * Delta_locals_ctor(Delta_locals * locals, bundle_end* in, bundle_end* out1, bundle_end* out2)
+Delta_locals * Delta_locals_ctor(Delta_locals * locals, BInt_reader in, BInt_writer out1, BInt_writer out2)
 {
 	locals->in = in;
 	locals->out1 = out1;
