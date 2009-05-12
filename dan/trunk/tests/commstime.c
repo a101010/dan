@@ -256,6 +256,7 @@ typedef struct BundleW_BInt_tag
 // backing store for BInt channel bundle
 typedef struct Bundle_BInt_tag
 {
+
     BundleR_BInt                *read;
     BundleW_BInt                *write;
     BundleR_BInt                readStore;
@@ -264,55 +265,49 @@ typedef struct Bundle_BInt_tag
 } Bundle_BInt;
 
 // BInt_chans constructor
-BInt_chans * BInt_chans_ctor(BInt_chans * chans)
+Bundle_BInt * Bundle_BInt_ctor(Bundle_BInt * chans)
 {
-    // Bundle reader end and associated channel ends
-    chans->reader = &(chans->reader_c);
-    chans->reader_c = chans;
-
-    // Bundle writer end and associated channel ends
-    chans->writer = &(chans->writer_c);
-    chans->writer_c = chans;
-
-    // apply to all channels in bundle
-	chans->is_poisoned = 0;
-
-    // channel c
-    chans->c_value = 0;
-	chans->c_valid_value = 0;
-	chans->c_reader_waiting = 0; 
-	chans->c_writer_waiting = 0;
-
-	return chans;
+    Channel_int32_0_blocking_ctor( &(chans->c) );
+    chans->readStore.c = chans->c.read;
+    chans->c.read = 0; // because it is a mobile type
+    chans->writeStore.c = chans->c.write;
+    chans->c.write = 0;
+    chans->read = &(chans->readStore);
+    chans->write = &(chans->writeStore);
+    return chans;
 }
 
 // there doesn't seem to be any general way to do channel read and write ops
 // returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
-int ChanRead_BInt_c_0(BInt_c_Reader reader, int32 * value, char ** exception, proc * p, scheduler * s)
+int Channel_int32_0_blocking_OpRead(Channel_int32 *chan, 
+                                    int32 *value, 
+                                    char **exception, 
+                                    proc *p, 
+                                    scheduler *s)
 {
-    BInt_chans * chans = (BInt_chans*) reader;
+    Channel_int32_0_blocking * c = (Channel_int32_0_blocking*) chan;
 	int ret_val = 2;
 	// TODO get the lock
-	if(chans->is_poisoned)
+	if(c->is_poisoned)
 	{
 		*exception = "channel poison";
 	}
 	else
 	{
-		if(chans->c_valid_value)
+		if(c->valid_value)
 		{
-			*value = chans->c_value;
-			chans->c_valid_value = 0;
-			if(chans->c_writer_waiting != 0)
+			*value = c->value;
+			c->valid_value = 0;
+			if(c->writer_waiting != 0)
 			{
-				s->schedule(s, chans->c_writer_waiting);
-				chans->c_writer_waiting = 0;
+				s->schedule(s, c->writer_waiting);
+				c->writer_waiting = 0;
 			}
 			ret_val = 0;
 		}
 		else
 		{
-			chans->c_reader_waiting = p;
+			c->reader_waiting = p;
 			ret_val = 1;
 		}
 	}
@@ -324,12 +319,16 @@ int ChanRead_BInt_c_0(BInt_c_Reader reader, int32 * value, char ** exception, pr
 
 // there doesn't seem to be any general way to do channel read and write ops
 // returns 0 if it got a valid value; 1 if it blocked; and 2 if an exception was thrown
-int ChanWrite_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception, proc * p, scheduler * s)
+int Channel_int32_0_blocking_OpWrite(Channel_int32 *chan, 
+                                     int32 value, 
+                                     void **exception, 
+                                     proc *p, 
+                                     scheduler *s)
 {
-    BInt_chans * chans = (BInt_chans*) writer;
+    Channel_int32_0_blocking * c = (Channel_int32_0_blocking*) chan;
 	int ret_val = 2;
 	// TODO get the lock
-	if(chans->is_poisoned)
+	if(c->is_poisoned)
 	{
 		// TODO make exceptions something other than just plain strings (& null terminated at that!)
 		*exception = (void*) "channel poison";
@@ -337,17 +336,17 @@ int ChanWrite_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception, pro
 	else
 	{
 		// TODO right now the writer allways unconditionally writes; allow to withdraw if in ALT
-		chans->c_value = value;
-		chans->c_valid_value = 1;
-		if(chans->c_reader_waiting != 0)
+		c->value = value;
+		c->valid_value = 1;
+		if(c->reader_waiting != 0)
 		{
-			s->schedule(s, chans->c_reader_waiting);
-			chans->c_reader_waiting = 0;
+			s->schedule(s, c->reader_waiting);
+			c->reader_waiting = 0;
 			ret_val = 0;
 		}
 		else
 		{
-			chans->c_writer_waiting = p;
+			c->writer_waiting = p;
 			ret_val = 1;
 		}
 		
@@ -358,33 +357,37 @@ int ChanWrite_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception, pro
 }
 
 // In this case the value has already been written, we're just checking to make sure it has been read
-int ChanWriteSync_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception, proc * p, scheduler * s)
+int Channel_int32_0_blocking_OpWriteHandshake(Channel_int32 *chan,
+                                              int32 value, 
+                                              void **exception, 
+                                              proc *p, 
+                                              scheduler *s)
 {
-    BInt_chans * chans = (BInt_chans*) writer;
+    Channel_int32_0_blocking * c = (Channel_int32_0_blocking*) chan;
 	int ret_val = 2;
 	// TODO get the lock
-	if(chans->is_poisoned)
+	if(c->is_poisoned)
 	{
 		// TODO make exceptions something other than just plain strings (& null terminated at that!)
 		*exception = (void*) "channel poison";
 	}
 	else
 	{
-		if(chans->c_reader_waiting != 0)
+		if(c->reader_waiting != 0)
 		{
-			s->schedule(s, chans->c_reader_waiting);
-			chans->c_reader_waiting = 0;
+			s->schedule(s, c->reader_waiting);
+			c->reader_waiting = 0;
 			ret_val = 0;
 		}
 		else
 		{
-			if(chans->c_valid_value == 0)
+			if(c->valid_value == 0)
 			{
 				ret_val = 0;
 			}
 			else
 			{
-				chans->c_writer_waiting = p;
+				c->writer_waiting = p;
 				ret_val = 1;
 			}
 		}
@@ -399,57 +402,36 @@ int ChanWriteSync_BInt_c_0(BInt_c_writer writer, int32 value, void ** exception,
 
 typedef BInt_chans* BInt_channel_end;
 
-void Poison_BInt_writer(BInt_channel_end end, scheduler * s)
+void Channel_int32_0_blocking_OpPoison(Channel_int32 *chan, scheduler *s)
 {
-    BInt_chans* chans = (BInt_chans*) end;
-	chans->is_poisoned = 1;
-	if( 0 != chans->c_reader_waiting)
+
+    Channel_int32_0_blocking *c = (Channel_int32_0_blocking*) chan;
+	c->is_poisoned = 1;
+	if( 0 != c->reader_waiting)
 	{
-		s->schedule(s, chans->c_reader_waiting);
-		chans->c_reader_waiting = 0;
+		s->schedule(s, c->reader_waiting);
+		c->reader_waiting = 0;
 	}
-    if( 0 != chans->c_writer_waiting)
+    if( 0 != c->writer_waiting)
 	{
-		s->schedule(s, chans->c_writer_waiting);
-		chans->c_writer_waiting = 0;
+		s->schedule(s, c->writer_waiting);
+		c->writer_waiting = 0;
 	}
 }
 
 
-int IsPoisoned_BInt(BInt_channel_end end)
+int Channel_int32_0_blocking_OpIsPoisoned(Channel_int32 *chan)
 {
-    BInt_chans* chans = (BInt_chans*) end;
-	return chans->is_poisoned;
+    Channel_int32_0_blocking *c = (Channel_int32_0_blocking*) chan;
+	return c->is_poisoned;
 }
-
-// may not need; bundle_end may be sufficient
-//// reader end ops structure for BInt chan c
-//typedef struct BInt_c_reader_tag_0
-//{
-//	// can't get any polymorphism for read and write at this stage
-//	//OpChanReadBInt0 read; // public 
-//	OpChanPoisonBInt0 poison;  // public 
-//	OpChanIsPoisonedBInt0 isPoisoned; // public 
-//	BInt_chans * chans;  // private
-//} BInt_c_reader_0;
-
-// may not need; bundle_end may be sufficient
-//// writer end ops structure for BInt chan c
-//typedef struct BInt_c_writer_tag_0
-//{
-//	// can't get any polymorphism for read and write at this stage
-//	//OpChanWriterBInt0 write;  // public
-//	OpChanPoisonBInt0 poison; // public
-//	OpChanIsPoisonedBInt0 isPoisoned; // public 
-//	BInt_chans * chans; // private
-//} BInt_c_writer_0;
 
 typedef struct Delta_locals_tag
 {
 	int32       value;
-	BInt_reader in;
-    BInt_writer out1;
-    BInt_writer out2;
+	BundleR_BInt * in;
+    BundleW_BInt * out1;
+    BundleW_BInt * out2;
 } Delta_locals;
 
 typedef struct Delta_proc_tag
@@ -459,7 +441,7 @@ typedef struct Delta_proc_tag
 } Delta_proc;
 
 // Delta_locals constructor
-Delta_locals * Delta_locals_ctor(Delta_locals * locals, BInt_reader in, BInt_writer out1, BInt_writer out2)
+Delta_locals * Delta_locals_ctor(Delta_locals * locals, BundleR_BInt * in, BundleW_BInt * out1, BundleW_BInt * out2)
 {
 	locals->in = in;
 	locals->out1 = out1;
@@ -477,7 +459,8 @@ void Delta_body(proc * p, scheduler * s)
 	while(1)
 	{
         saveState(p->state, Delta_S1);
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
+        ChanR_int32 * in_r = locals->in->c;
+		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -495,7 +478,8 @@ void Delta_body(proc * p, scheduler * s)
 			goto EXIT;
 		}
 
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out1->chans, locals->value, (void**) &p->exception, p, s);
+        ChanW_int32 *out1_w = locals->out1->c;
+		result = out1_w->write( out1_w->channel, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -505,7 +489,7 @@ void Delta_body(proc * p, scheduler * s)
             saveState(p->state, Delta_S2);
             if(result == 1)
                 goto EXIT;
-            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out1->chans, (void **) &p->exception, p, s);
+            result = out1_w->writeHandshake( out1_w->channel, (void **) &p->exception, p, s);
 			switch(result)
 			{
 		    case 0 : // wrote value
@@ -533,7 +517,8 @@ void Delta_body(proc * p, scheduler * s)
 			goto EXIT;
 		}
 		
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out2->chans, locals->value, (void **) &p->exception, p, s);
+        ChanW_int32 *out2_w = locals->out2->c;
+		result = out2_w->write( out2_w->channel, locals->value, (void **) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -544,7 +529,7 @@ void Delta_body(proc * p, scheduler * s)
 			saveState(p->state, Delta_S3);
             if(result == 1)
                 goto EXIT;
-            result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out2->chans, (void **) &p->exception, p, s);
+            result = out2_w->writeHandshake( out2_w->channel, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -585,9 +570,9 @@ EXIT:
         
         printf("Delta: cleaning up self. Final state is %s\n", 
             proc_state_to_string(p->state));
-		locals->in->poison(locals->in->chans, s);
-		locals->out1->poison(locals->out1->chans, s);
-		locals->out2->poison(locals->out2->chans, s);
+		locals->in->c->type->poison(locals->in->c->channel, s);
+		locals->out1->c->type->poison(locals->out1->c->channel, s);
+		locals->out2->c->type->poison(locals->out2->c->channel, s);
 	}
 }
 
@@ -980,20 +965,20 @@ void Commstime_body(proc * p, scheduler * s)
         restoreState(p->state);
 
 	BInt_chans_ctor( &(locals->a) );
-	BInt_reader_end_ctor( &(locals->a_reader), &(locals->a));
-	BInt_writer_end_ctor( &(locals->a_writer), &(locals->a));
+	BundleR_BInt *_end_ctor( &(locals->a_reader), &(locals->a));
+	BundleW_BInt *_end_ctor( &(locals->a_writer), &(locals->a));
 
 	BInt_chans_ctor( &(locals->b) );
-	BInt_reader_end_ctor( &(locals->b_reader), &(locals->b));
-	BInt_writer_end_ctor( &(locals->b_writer), &(locals->b));
+	BundleR_BInt *_end_ctor( &(locals->b_reader), &(locals->b));
+	BundleW_BInt *_end_ctor( &(locals->b_writer), &(locals->b));
 
 	BInt_chans_ctor( &(locals->c) );
-	BInt_reader_end_ctor( &(locals->c_reader), &(locals->c));
-	BInt_writer_end_ctor( &(locals->c_writer), &(locals->c));
+	BundleR_BInt *_end_ctor( &(locals->c_reader), &(locals->c));
+	BundleW_BInt *_end_ctor( &(locals->c_writer), &(locals->c));
 
 	BInt_chans_ctor( &(locals->d) );
-	BInt_reader_end_ctor( &(locals->d_reader), &(locals->d));
-	BInt_writer_end_ctor( &(locals->d_writer), &(locals->d));
+	BundleR_BInt *_end_ctor( &(locals->d_reader), &(locals->d));
+	BundleW_BInt *_end_ctor( &(locals->d_writer), &(locals->d));
 
 	Delta_locals_ctor( &(locals->pDelta1.locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
 	proc_ctor( &(locals->pDelta1), "Delta", p, Delta_body);
