@@ -151,7 +151,7 @@ typedef struct ChanW_int32_Type_tag
     OpIsPoisoned isPoisoned;
     OpToString toString;
     // TODO add other Object type methods
-} ChanW_int32_Type_tag;
+} ChanW_int32_Type;
 
 typedef int (*OpChanWrite_int32)(struct Channel_int32_tag* channel, 
                                  int32 value, 
@@ -160,8 +160,7 @@ typedef int (*OpChanWrite_int32)(struct Channel_int32_tag* channel,
                                  scheduler * s);
 
 // TODO see if we can get rid of this one
-typedef int (*OpChanWriteHandshake_int32)(struct Channel_int32_tag* channel, 
-                                 int32 value, 
+typedef int (*OpChanWriteHandshake_int32)(struct Channel_int32_tag* channel,
                                  void ** exception, 
                                  proc * p, 
                                  scheduler * s);
@@ -189,28 +188,36 @@ typedef struct Channel_int32_tag
     ChanW_int32     writeStore;
 } Channel_int32;
 
-static struct Channel_int32_0_blocking_type_tag
+
+
+struct Channel_int32_0_blocking_type_tag
 {
     // TODO may also need a lock
-    int initialized = 0;
+    int initialized;
     ChanR_int32_Type reader;
     ChanW_int32_Type writer;
-} Channel_int32_0_blocking_type;
+} Channel_int32_0_blocking_type = {0};
 
-Channel_int32_0_blocking_type_init()
+void Channel_int32_0_blocking_OpPoison(Channel_int32 *chan, scheduler *s);
+int Channel_int32_0_blocking_OpIsPoisoned(Channel_int32 *chan);
+// TODO need a string type; no null-terminated strings in Danger.
+char * Channel_int32_0_blocking_ChanW_OpToString(Channel_int32 *chan);
+char * Channel_int32_0_blocking_ChanR_OpToString(Channel_int32 *chan);
+
+void Channel_int32_0_blocking_type_init()
 {
     struct Channel_int32_0_blocking_type_tag *type =
         &Channel_int32_0_blocking_type;
     if(0 == type->initialized)
     {
         // TODO can factor out everything but the toString operations if we want
-        type->reader.readStore.poison = Channel_int32_0_blocking_OpPoison;
-        type->reader.readStore.isPoisoned = Channel_int32_0_blocking_OpIsPoisoned;
-        type->reader.readStore.toString = Channel_int32_0_blocking_ChanR_OpToString;
-        type->writer.writeStore.poison = Channel_int32_0_blocking_OpPoison;
-        type->writer.writeStore.isPoisoned = Channel_int32_0_blocking_OpIsPoisoned;
-        type->writer.writeStore.toString = Channel_int32_0_blocking_ChanW_OpToString;
-        type->initialied = 1;
+        type->reader.poison = Channel_int32_0_blocking_OpPoison;
+        type->reader.isPoisoned = Channel_int32_0_blocking_OpIsPoisoned;
+        type->reader.toString = Channel_int32_0_blocking_ChanR_OpToString;
+        type->writer.poison = Channel_int32_0_blocking_OpPoison;
+        type->writer.isPoisoned = Channel_int32_0_blocking_OpIsPoisoned;
+        type->writer.toString = Channel_int32_0_blocking_ChanW_OpToString;
+        type->initialized = 1;
     }
 }
 
@@ -225,23 +232,6 @@ typedef struct Channel_int32_0_blocking_tag
 	proc * writer_waiting; // writer waiting to syncronize on the channel
 } Channel_int32_0_blocking;
 
-Channel_int32_0_blocking * Channel_int32_0_blocking_ctor(Channel_int32_0_blocking_ctor * channel)
-{
-    Channel_int32_0_blocking_type_init();
-    channel->ends.readStore.read = Channel_int32_0_blocking_OpRead;
-    channel->ends.readStore.channel = (Channel_int32*) channel;
-    channel->ends.readStore.type = &(Channel_int32_0_blocking_type.reader);
-    channel->ends.writeStore.write = Channel_int32_0_blocking_OpWrite;
-    channel->ends.writeStore.writeHandshake = Channel_int32_0_blocking_OpWriteHandshake;
-    channel->ends.writeStore.channel = (Channel_int32*) channel;
-    channel->ends.writeStore.type = &Channel_int32_0_blocking_type.writer);
-    channel->ends.read = &readStore;
-    channel->ends.write = &writeStore;
-    channel->is_poisoned = 0;
-    channel->valid_value = 0;
-    channel->reader_waiting = 0;
-    channel->writer_waiting = 0;
-}
 
 typedef struct BundleR_BInt_tag
 {
@@ -263,19 +253,6 @@ typedef struct Bundle_BInt_tag
     BundleW_BInt                writeStore;
     Channel_int32_0_blocking    c;
 } Bundle_BInt;
-
-// BInt_chans constructor
-Bundle_BInt * Bundle_BInt_ctor(Bundle_BInt * chans)
-{
-    Channel_int32_0_blocking_ctor( &(chans->c) );
-    chans->readStore.c = chans->c.read;
-    chans->c.read = 0; // because it is a mobile type
-    chans->writeStore.c = chans->c.write;
-    chans->c.write = 0;
-    chans->read = &(chans->readStore);
-    chans->write = &(chans->writeStore);
-    return chans;
-}
 
 // there doesn't seem to be any general way to do channel read and write ops
 // returns 0 if it wrote the value and synchronized; 1 if it blocked; and 2 if an exception was thrown
@@ -358,7 +335,6 @@ int Channel_int32_0_blocking_OpWrite(Channel_int32 *chan,
 
 // In this case the value has already been written, we're just checking to make sure it has been read
 int Channel_int32_0_blocking_OpWriteHandshake(Channel_int32 *chan,
-                                              int32 value, 
                                               void **exception, 
                                               proc *p, 
                                               scheduler *s)
@@ -397,10 +373,40 @@ int Channel_int32_0_blocking_OpWriteHandshake(Channel_int32 *chan,
 	return ret_val;
 }
 
+Channel_int32_0_blocking * Channel_int32_0_blocking_ctor(Channel_int32_0_blocking * channel)
+{
+    Channel_int32_0_blocking_type_init();
+    channel->ends.readStore.read = Channel_int32_0_blocking_OpRead;
+    channel->ends.readStore.channel = (Channel_int32*) channel;
+    channel->ends.readStore.type = &(Channel_int32_0_blocking_type.reader);
+    channel->ends.writeStore.write = Channel_int32_0_blocking_OpWrite;
+    channel->ends.writeStore.writeHandshake = Channel_int32_0_blocking_OpWriteHandshake;
+    channel->ends.writeStore.channel = (Channel_int32*) channel;
+    channel->ends.writeStore.type = &(Channel_int32_0_blocking_type.writer);
+    channel->ends.read = &(channel->ends.readStore);
+    channel->ends.write = &(channel->ends.writeStore);
+    channel->is_poisoned = 0;
+    channel->valid_value = 0;
+    channel->reader_waiting = 0;
+    channel->writer_waiting = 0;
+    return channel;
+}
+
+// BInt_chans constructor
+Bundle_BInt * Bundle_BInt_ctor(Bundle_BInt * chans)
+{
+    Channel_int32_0_blocking_ctor( &(chans->c) );
+    chans->readStore.c = chans->c.ends.read;
+    chans->c.ends.read = 0; // because it is a mobile type
+    chans->writeStore.c = chans->c.ends.write;
+    chans->c.ends.write = 0;
+    chans->read = &(chans->readStore);
+    chans->write = &(chans->writeStore);
+    return chans;
+}
+
 // TODO need to get locks for poison operations 
 // (for _reader_waiting and _writer_waiting, and to prevent reads and writes during the poison operation)
-
-typedef BInt_chans* BInt_channel_end;
 
 void Channel_int32_0_blocking_OpPoison(Channel_int32 *chan, scheduler *s)
 {
@@ -424,6 +430,22 @@ int Channel_int32_0_blocking_OpIsPoisoned(Channel_int32 *chan)
 {
     Channel_int32_0_blocking *c = (Channel_int32_0_blocking*) chan;
 	return c->is_poisoned;
+}
+
+char * Channel_int32_0_blocking_ChanW_OpToString(Channel_int32 *chan)
+{
+    //Channel_int32_0_blocking *c = (Channel_int32_0_blocking*) chan;
+    // TODO might be nice to allow assigning a string id to channels
+    // or a default GUID
+    return "Channel<int32>(0, blocking).Writer";
+}
+
+char * Channel_int32_0_blocking_ChanR_OpToString(Channel_int32 *chan)
+{
+    //Channel_int32_0_blocking *c = (Channel_int32_0_blocking*) chan;
+    // TODO might be nice to allow assigning a string id to channels
+    // or a default GUID
+    return "Channel<int32>(0, blocking).Reader";
 }
 
 typedef struct Delta_locals_tag
@@ -453,13 +475,20 @@ void Delta_body(proc * p, scheduler * s)
 {
 	int result = 0;
     Delta_proc *dp = (Delta_proc *) p;
-	Delta_locals* locals = &(dp->locals);
+	Delta_locals *locals = &(dp->locals);
     if(p->state != _PS_READY_TO_RUN_)
+    {
         restoreState(p->state);
+    }
 	while(1)
 	{
+        ChanR_int32 *in_r;
+        ChanW_int32 *out1_w;
+        ChanW_int32 *out2_w;
+        
         saveState(p->state, Delta_S1);
-        ChanR_int32 * in_r = locals->in->c;
+        in_r = locals->in->c;
+
 		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
@@ -477,8 +506,8 @@ void Delta_body(proc * p, scheduler * s)
 			p->exception = "unexpected result from ChanRead_BInt_c_0 in Delta_body"; // TODO find a way to allocate constructed string that doesn't use malloc
 			goto EXIT;
 		}
-
-        ChanW_int32 *out1_w = locals->out1->c;
+        
+        out1_w = locals->out1->c;
 		result = out1_w->write( out1_w->channel, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
@@ -487,6 +516,7 @@ void Delta_body(proc * p, scheduler * s)
 			break;
 		case 1 : // blocked
             saveState(p->state, Delta_S2);
+            out1_w = locals->out1->c;
             if(result == 1)
                 goto EXIT;
             result = out1_w->writeHandshake( out1_w->channel, (void **) &p->exception, p, s);
@@ -517,7 +547,7 @@ void Delta_body(proc * p, scheduler * s)
 			goto EXIT;
 		}
 		
-        ChanW_int32 *out2_w = locals->out2->c;
+        out2_w = locals->out2->c;
 		result = out2_w->write( out2_w->channel, locals->value, (void **) &p->exception, p, s);
 		switch(result)
 		{
@@ -527,6 +557,7 @@ void Delta_body(proc * p, scheduler * s)
 			break;
 		case 1 : // blocked
 			saveState(p->state, Delta_S3);
+            out2_w = locals->out2->c;
             if(result == 1)
                 goto EXIT;
             result = out2_w->writeHandshake( out2_w->channel, (void **) &p->exception, p, s);
@@ -579,8 +610,8 @@ EXIT:
 typedef struct Succ_locals_tag
 {
 	int32 value;
-	bundle_end *in;
-    bundle_end *out;
+	BundleR_BInt *in;
+    BundleW_BInt *out;
 } Succ_locals;
 
 typedef struct Succ_proc_tag
@@ -590,7 +621,7 @@ typedef struct Succ_proc_tag
 } Succ_proc;
 
 // Succ_locals constructor
-Succ_locals * Succ_locals_ctor(Succ_locals * locals, bundle_end* in, bundle_end* out)
+Succ_locals * Succ_locals_ctor(Succ_locals * locals, BundleR_BInt* in, BundleW_BInt* out)
 {
 	locals->in = in;
 	locals->out = out;
@@ -606,9 +637,13 @@ void Succ_body(proc * p, scheduler *s)
         restoreState(p->state);
 	while(1)
 	{
+        ChanR_int32 * in_r;
+        ChanW_int32 *out_w;
+
         saveState(p->state, Succ_S1);
 		
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
+		in_r = locals->in->c;
+		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -629,7 +664,8 @@ void Succ_body(proc * p, scheduler *s)
 		++(locals->value);
         
 		
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out->chans, locals->value, (void **) &p->exception, p, s);
+		out_w = locals->out->c;
+		result = out_w->write( out_w->channel, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -637,9 +673,10 @@ void Succ_body(proc * p, scheduler *s)
 			break;
 		case 1 : // blocked
 			saveState(p->state, Succ_S2);
+            out_w = locals->out->c;
             if(result == 1)
                 goto EXIT;
-			result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out->chans, (void **) &p->exception, p, s);
+			result = out_w->writeHandshake( out_w->channel, (void **) &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // wrote value
@@ -680,8 +717,8 @@ EXIT:
 	{
         printf("Succ: cleaning up self. Final state is %s\n", 
             proc_state_to_string(p->state));
-		locals->in->poison(locals->in->chans, s);
-		locals->out->poison(locals->out->chans, s);
+		locals->in->c->type->poison(locals->in->c->channel, s);
+		locals->out->c->type->poison(locals->out->c->channel, s);
 	}
 }
 
@@ -689,8 +726,8 @@ EXIT:
 typedef struct Prefix_locals_tag
 {
 	int32 value;
-	bundle_end *in;
-    bundle_end *out;
+	BundleR_BInt *in;
+    BundleW_BInt *out;
 } Prefix_locals;
 
 typedef struct Prefix_proc_tag
@@ -700,7 +737,7 @@ typedef struct Prefix_proc_tag
 } Prefix_proc;
 
 // Prefix_locals constructor
-Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, bundle_end * in, bundle_end * out, int32 initValue)
+Prefix_locals * Prefix_locals_ctor(Prefix_locals * locals, BundleR_BInt * in, BundleW_BInt * out, int32 initValue)
 {
 	locals->in = in;
 	locals->out = out;
@@ -714,11 +751,12 @@ void Prefix_body(proc * p, scheduler * s)
 	int result = 0;
     Prefix_proc *pp = (Prefix_proc*) p;
 	Prefix_locals * locals = &(pp->locals);
+    ChanW_int32 *out_w = locals->out->c;
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 
     printf("Prefix init value: %d\n", locals->value); 
-	result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out->chans, locals->value, (void **) &(p->exception), p, s); 
+	result = out_w->write( out_w->channel, locals->value, (void**) &p->exception, p, s);
 	switch(result)
 	{
 	case 0: // wrote value and synced
@@ -728,7 +766,7 @@ void Prefix_body(proc * p, scheduler * s)
         saveState(p->state, Prefix_S1);
         if(result == 1)
             goto EXIT;
-		result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out->chans, (void **) &(p->exception), p, s); 
+		result = out_w->writeHandshake( out_w->channel, (void **) &p->exception, p, s);
 		switch(result)
 		{
 		case 0: // wrote value and synced
@@ -758,8 +796,10 @@ void Prefix_body(proc * p, scheduler * s)
 
 	while(1)
 	{
+        ChanR_int32 * in_r;
         saveState(p->state, Prefix_S2);
-		result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
+		in_r = locals->in->c;
+		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -778,7 +818,8 @@ void Prefix_body(proc * p, scheduler * s)
             goto EXIT;
 		}
 		
-		result = ChanWrite_BInt_c_0( (BInt_chans*) locals->out->chans, locals->value, (void **) &p->exception, p, s);
+		//ChanW_int32 *out_w = locals->out->c;
+		result = out_w->write( out_w->channel, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -788,7 +829,7 @@ void Prefix_body(proc * p, scheduler * s)
             saveState(p->state, Prefix_S3);
             if(result == 1)
                 goto EXIT;
-		    result = ChanWriteSync_BInt_c_0( (BInt_chans*) locals->out->chans, (void **) &(p->exception), p, s); 
+		    result = out_w->writeHandshake( out_w->channel, (void **) &p->exception, p, s);
 		    switch(result)
 		    {
 		    case 0: // wrote value and synced
@@ -828,8 +869,8 @@ EXIT:
 	{
         printf("Prefix: cleaning up self. Final state is %s\n", 
             proc_state_to_string(p->state));
-		locals->in->poison(locals->in->chans, s);
-		locals->out->poison(locals->out->chans, s);
+		locals->in->c->type->poison(locals->in->c->channel, s);
+		locals->out->c->type->poison(locals->out->c->channel, s);
 	}
 }
 
@@ -842,7 +883,7 @@ typedef struct Count_locals_tag
 	int32 time;
 	time_t time1;
 	time_t time2;
-	bundle_end *in;
+	BundleR_BInt *in;
 } Count_locals;
 
 typedef struct Count_proc_tag
@@ -852,7 +893,7 @@ typedef struct Count_proc_tag
 } Count_proc;
 
 // Count_locals constructor
-Count_locals * Count_locals_ctor(Count_locals * locals, bundle_end * in)
+Count_locals * Count_locals_ctor(Count_locals * locals, BundleR_BInt * in)
 {
 	locals->in = in;
 	locals->step = 1000;
@@ -876,8 +917,10 @@ void Count_body(proc * p, scheduler * s)
 		time( &(locals->time1));
         while(locals->i < locals->step)
         {
+            ChanR_int32 * in_r;
 			saveState(p->state, Count_S1);
-			result = ChanRead_BInt_c_0( (BInt_chans*) locals->in->chans, &(locals->value), &p->exception, p, s);
+			in_r = locals->in->c;
+		    result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // read value
@@ -918,7 +961,7 @@ EXIT:
 	{
         printf("Count: cleaning up self. Final state is %s\n", 
             proc_state_to_string(p->state));
-		locals->in->poison(locals->in->chans, s);
+		locals->in->c->type->poison(locals->in->c->channel, s);
 	}
 }
 
@@ -926,18 +969,10 @@ EXIT:
 
 typedef struct Commstime_locals_tag
 {
-	BInt_chans a;
-	bundle_end a_reader;
-	bundle_end a_writer;
-	BInt_chans b;
-	bundle_end b_reader;
-	bundle_end b_writer;
-	BInt_chans c;
-	bundle_end c_reader;
-	bundle_end c_writer;
-	BInt_chans d;
-	bundle_end d_reader;
-	bundle_end d_writer;
+	Bundle_BInt a;
+	Bundle_BInt b;
+	Bundle_BInt c;
+	Bundle_BInt d;
 	Delta_proc pDelta1;
 	Succ_proc pSucc1;
 	Prefix_proc pPrefix1;
@@ -964,38 +999,27 @@ void Commstime_body(proc * p, scheduler * s)
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 
-	BInt_chans_ctor( &(locals->a) );
-	BundleR_BInt *_end_ctor( &(locals->a_reader), &(locals->a));
-	BundleW_BInt *_end_ctor( &(locals->a_writer), &(locals->a));
+	Bundle_BInt_ctor( &(locals->a) );
+	Bundle_BInt_ctor( &(locals->b) );
+	Bundle_BInt_ctor( &(locals->c) );
+	Bundle_BInt_ctor( &(locals->d) );
 
-	BInt_chans_ctor( &(locals->b) );
-	BundleR_BInt *_end_ctor( &(locals->b_reader), &(locals->b));
-	BundleW_BInt *_end_ctor( &(locals->b_writer), &(locals->b));
+	Delta_locals_ctor( &(locals->pDelta1.locals), locals->a.read, locals->b.write, locals->c.write);
+	proc_ctor( (proc*) &(locals->pDelta1), "Delta", p, Delta_body);
 
-	BInt_chans_ctor( &(locals->c) );
-	BundleR_BInt *_end_ctor( &(locals->c_reader), &(locals->c));
-	BundleW_BInt *_end_ctor( &(locals->c_writer), &(locals->c));
-
-	BInt_chans_ctor( &(locals->d) );
-	BundleR_BInt *_end_ctor( &(locals->d_reader), &(locals->d));
-	BundleW_BInt *_end_ctor( &(locals->d_writer), &(locals->d));
-
-	Delta_locals_ctor( &(locals->pDelta1.locals), &(locals->a_reader), &(locals->b_writer), &(locals->c_writer));
-	proc_ctor( &(locals->pDelta1), "Delta", p, Delta_body);
-
-	Count_locals_ctor( &(locals->pCount1.locals), &(locals->b_reader));
-	proc_ctor( &(locals->pCount1), "Count", p, Count_body);
+	Count_locals_ctor( &(locals->pCount1.locals), locals->b.read);
+	proc_ctor( (proc*) &(locals->pCount1), "Count", p, Count_body);
 	
-	Prefix_locals_ctor( &(locals->pPrefix1.locals), &(locals->d_reader), &(locals->a_writer), 22);
-	proc_ctor( &(locals->pPrefix1), "Prefix", p, Prefix_body);
+	Prefix_locals_ctor( &(locals->pPrefix1.locals), locals->d.read, locals->a.write, 22);
+	proc_ctor( (proc*) &(locals->pPrefix1), "Prefix", p, Prefix_body);
 
-	Succ_locals_ctor( &(locals->pSucc1.locals), &(locals->c_reader), &(locals->d_writer));
-	proc_ctor( &(locals->pSucc1), "Succ", p, Succ_body);
+	Succ_locals_ctor( &(locals->pSucc1.locals), locals->c.read, locals->d.write);
+	proc_ctor( (proc*) &(locals->pSucc1), "Succ", p, Succ_body);
 	
-	s->schedule(s, &(locals->pPrefix1));
-	s->schedule(s, &(locals->pDelta1));
-	s->schedule(s, &(locals->pSucc1));
-	s->schedule(s, &(locals->pCount1));
+	s->schedule(s, (struct proc_tag*) &(locals->pPrefix1));
+	s->schedule(s, (proc*) &(locals->pDelta1));
+	s->schedule(s, (proc*) &(locals->pSucc1));
+	s->schedule(s, (proc*) &(locals->pCount1));
 		
 	saveState(p->state, Commstime_S1);
 	lock(locals->pCount1.p.spinlock);
@@ -1191,7 +1215,6 @@ typedef struct Scheduler_default_tag
 int Schedule_default(scheduler * s, proc * p)
 {
 	Scheduler_default * _ctxt;
-	list_node * pn;
 	list_node * result_node;
 
 	lock(p->spinlock);
