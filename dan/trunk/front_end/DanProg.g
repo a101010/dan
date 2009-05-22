@@ -11,13 +11,17 @@ tokens
 	BUNDLE_CHANNELS;
 	BUNDLE_PROTOCOL;
 	CHAN_DEF;
+	CONSTRUCTOR;
 	ALL;
 	ADORNMENTS;
 	DECLARATION;
 	PARAMLIST;
-	PARAM;
+	MOBILE_PARAM;
+	STATIC_PARAM;
 	BLOCK;
-	VARDEC;
+	MOBILE_VARDEC;
+	STATIC_VARDEC;
+	LOCAL_VARDEC;
 	CALL;
 	ARGLIST;
 	EXP;
@@ -254,7 +258,16 @@ paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
 
-param 		: type=ID name=ID 
+param 		: 'static' type=ID name=ID
+		{
+		DanType varType = types.get($type.getText());
+		if(varType == null){
+			// TODO add a type lookahead
+			throw new TypeException($type, "type is not defined");
+		}
+		$procDec::paramList.add(new StaticVardec(varType, name));
+		} -> ^(STATIC_PARAM $type $name)
+		| 'mobile'? type=ID name=ID 
 		{
 		DanType varType = types.get($type.getText());
 		if(varType == null){
@@ -262,7 +275,7 @@ param 		: type=ID name=ID
 			throw new TypeException($type, "type is not defined");
 		}
 		$procDec::paramList.add(new Vardec(varType, name));
-		} -> ^(PARAM $type $name);
+		} -> ^(MOBILE_PARAM $type $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
@@ -303,35 +316,60 @@ par_stmt	: 'par' block -> ^('par' block);
 
 succ_stmt	: 'succ' block -> ^('succ' block);
 
-vardec_stmt 	scope
+vardec_stmt 	: 'static' type=ID name=ID
 		{
-		ArrayList<Token> names;
-		}
-		@init
-		{
-		$vardec_stmt::names = new ArrayList<Token>();
-		}
-		: ID var_init (',' var_init)* 
-		{
-		DanType varType = types.get($ID.getText());
+		DanType varType = types.get($type.getText());
 		if(varType == null){
 			// TODO add a type lookahead
-			throw new TypeException($ID, "type is not defined");
+			System.out.println(
+				"unknown type:"
+				+ $type.text
+				+ " at "
+				+ $type.line + ":" + $type.pos
+				);
+			++errorCount;
+		} else {
+			ArrayList<Vardec> symbols = $block::symbols;
+			symbols.add(new Vardec(Vardec.StorageClass.Static, varType, $name));
 		}
-		ArrayList<Vardec> symbols = $block::symbols;
-		for(Token name : $vardec_stmt::names){
-			symbols.add(new Vardec(varType, name));
 		}
-		} -> ^(VARDEC ID var_init)+;
+		| 'local' type=ID name=ID
+		{
+		DanType varType = types.get($type.getText());
+		if(varType == null){
+			// TODO add a type lookahead
+			System.out.println(
+				"unknown type:"
+				+ $type.text
+				+ " at "
+				+ $type.line + ":" + $type.pos
+				);
+			++errorCount;
+		} else {
+			ArrayList<Vardec> symbols = $block::symbols;
+			symbols.add(new Vardec(Vardec.StorageClass.Local, varType, $name));
+		}
+		}
+		
+		| 'mobile'? type=ID name=ID 
+		{
+		DanType varType = types.get($type.getText());
+		if(varType == null){
+			// TODO add a type lookahead
+			System.out.println(
+				"unknown type:"
+				+ $type.text
+				+ " at "
+				+ $type.line + ":" + $type.pos
+				);
+			++errorCount;
+		} else {
+			ArrayList<Vardec> symbols = $block::symbols;
+			symbols.add(new Vardec(Vardec.StorageClass.Mobile, varType, $name));
+			
+		}
+		} -> ^(MOBILE_VARDEC $type $name);
 
-var_init 	: ID 
-		{
-		$vardec_stmt::names.add($ID);
-		} -> ID
-		| ID '='^ exp
-		{
-		$vardec_stmt::names.add($ID);
-		};
 
 send_stmt 	: ID '!' exp 
 		{
@@ -423,7 +461,43 @@ atom 		: literal
 		}
 		}
 		| call 
+		| new
 		| '(' exp ')' -> exp;
+		
+pool		: 'static' | 'local' | ID;
+		
+new		: 'new' '(' pool ')' type=ID '(' arg_list ')' 
+		{
+		// type is a constructable type (right now limited to channels)
+		// pool is the location to allocate
+		// 	static - static allocation in a proc's context
+		//	local - envelope of a MobileObject
+		//		alternate ideas 'this'
+		//		name of reference if allocating from an enclosing proc with
+		//		an envelope reference
+		//	msg - system global pool
+		//	app - app global pool (similar to traditional heap; in fact will use malloc
+		//		at first)
+		//	<UserDefinedPool> - A custom pool specified by the user
+		// Right now we'll support static only, TODO the rest
+		if($pool.text != "static"){
+			System.out.println(
+				"unknown pool:"
+				+ $pool.text
+				+ " at "
+				+ $pool.start.line + ":" + $pool.start.pos);
+			++errorCount;
+		}
+		DanType conType = types.get($type.text);
+		if(conType == null){
+			System.out.println(
+				"unknown type: "
+				+ $type.text
+				+ " at "
+				+ $type.line + ":" + $type.pos);
+			++errorCount;
+		}
+		} -> ^(CONSTRUCTOR pool $type arg_list);
 
 call 		: ID '(' arg_list ')' 
 		{
@@ -431,18 +505,13 @@ call 		: ID '(' arg_list ')'
 		// TODO right now we just search proc types; add method calls
 		// (Can use getSymbolType)
 		ProcType procType = null;
-		try{
 		procType = (ProcType) types.get($ID.text);
-		if(procType == null)
-			throw new Exception("type was null");
-		}
-		catch(Exception ex){
+		if(procType == null){
 			System.out.println("proc type undefined: " 
 				+ $ID.text
 				+ " at "
 				+ $ID.line + ":" + $ID.pos);
 			++errorCount;
-			procType = null;
 		}
 		} -> ^(CALL ID arg_list);
 
