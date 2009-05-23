@@ -22,6 +22,8 @@ tokens
 	GENERIC_TYPE;
 	GENERIC_PARAMLIST;
 	IMPORTS;
+	NO_ARG;
+	NO_INIT;
 	PARAM;
 	PARAMLIST;
 	PROGRAM;
@@ -224,6 +226,7 @@ channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID
 	
 channel_dir 	: '->' | '<-';
 
+// TODO add constructors
 attrib 		: '[' ID ']' -> ID;
 
 attribAdorn 	: attrib+ -> ^(ADORNMENTS attrib+);
@@ -275,7 +278,7 @@ param 		: paramStorageClass typeId name=ID
 			throw new TypeException($typeId.start, "type is not defined");
 		}
 		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, varType, $name));
-		} -> ^(PARAM typeId $name);
+		} -> ^(PARAM paramStorageClass typeId $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
@@ -334,24 +337,9 @@ vardec_stmt 	: storageClass typeId name=ID varInit
 			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
 		}
 		} -> ^(VARDEC storageClass typeId $name varInit);
-		/*| storageClass typeId name=ID '=' exp
-		{
-		DanType varType = types.get($typeId.getText());
-		if(varType == null){
-			// TODO add a type lookahead
-			System.out.println(
-				"unknown type:"
-				+ $typeId.text
-				+ " at "
-				+ $typeId.line + ":" + $typeId.pos
-				);
-			++errorCount;
-		} else {
-			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
-		}
-		} -> ^(VARDEC storageClass typeId $name exp);*/
 		
-varInit		: ('=' exp)? -> exp;
+varInit		: ('=' exp) -> '=' exp
+		| -> NO_INIT;
 
 
 send_stmt 	: ID '!' exp 
@@ -499,7 +487,8 @@ call 		: ID '(' arg_list ')'
 		}
 		} -> ^(CALL ID arg_list);
 
-arg_list 	: exp?  (',' exp)* -> ^(ARGLIST exp+);
+arg_list 	: exp  (',' exp)* -> ^(ARGLIST exp+)
+		| -> ^(ARGLIST NO_ARG);
 
 literal 	: bool_lit | FLOAT_LIT | INT_LIT;
 
