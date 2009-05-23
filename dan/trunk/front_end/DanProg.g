@@ -16,18 +16,17 @@ tokens
 	CHAN_DEF;
 	CHAN_PARAMS;
 	CHAN_NOBUFFER;
-	CHAN_TYPE;
 	CONSTRUCTOR;
 	DECLARATION;
 	EXP;
 	GENERIC_TYPE;
 	GENERIC_PARAMLIST;
 	IMPORTS;
-	MOBILE_PARAM;
+	PARAM;
 	PARAMLIST;
 	PROGRAM;
-	STATIC_PARAM;
 	VARDEC;
+	VARINIT;
 }
 
 
@@ -157,15 +156,15 @@ channel_params	: channel_depth ',' channel_behavior -> ^(CHAN_PARAMS channel_dep
 		| -> ^(CHAN_PARAMS CHAN_NOBUFFER 'block'); 
 	
 
-channel_dec 	: 'channel' '<' proto_type=ID '>' '(' channel_params ')' name=ID channel_dir STMT_END 
+channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID channel_dir STMT_END 
 	{
 	
 	// TODO the generic version of these types should be builtin types.
 	// For now we'll just search for the final type and add it if it isn't present yet,
 	// but reuse it if it is.
-	String readerEndName = "ChannelReader<" + $proto_type + ">";
-	String writerEndName = "ChannelWriter<" + $proto_type + ">";
-	String channelName = "SyncChannel<" + $proto_type + ">";
+	String readerEndName = "chanr<" + $genericParamList.text + ">";
+	String writerEndName = "chanw<" + $genericParamList.text + ">";
+	String channelName = "channel<" + $genericParamList.text + ">(" + $channel_params.text + ")";
 	// all three should either be defined or not; it would be an error for one of them
 	// to be in the symbol table but not the others
 	ChannelReaderType readerType;
@@ -190,10 +189,10 @@ channel_dec 	: 'channel' '<' proto_type=ID '>' '(' channel_params ')' name=ID ch
 		if(types.containsKey(readerEndName) || types.containsKey(writerEndName))
 			throw new RuntimeException("inconsistent channel type presence in types table");
 	
-		readerType = new ChannelReaderType($proto_type);
-		writerType = new ChannelWriterType($proto_type);
+		readerType = new ChannelReaderType($genericParamList.text);
+		writerType = new ChannelWriterType($genericParamList.text);
 		// TODO right now all channels are synchronous with zero depth
-		channelType = new ChannelType($proto_type);
+		channelType = new ChannelType($genericParamList.text);
 		
 		
 		
@@ -221,7 +220,7 @@ channel_dec 	: 'channel' '<' proto_type=ID '>' '(' channel_params ')' name=ID ch
 	// (which may require a rule without the channel_dir)
 	
 	
-	} -> ^('channel' $proto_type $name channel_dir);
+	} -> ^('channel' genericParamList $name channel_dir);
 	
 channel_dir 	: '->' | '<-';
 
@@ -259,40 +258,34 @@ paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
 genericParamList
-	:	ID (',' ID)* -> ^(GENERIC_PARAMLIST ID+);
+	:	typeId (',' typeId)* -> ^(GENERIC_PARAMLIST ID+);
 
-typeId		: ID 
-		| type=ID '<' genericParamList '>' -> GENERIC_TYPE $type genericParamList
-		| 'channel' '<' protocol=ID '>' -> CHAN_TYPE $protocol;
+typeId		: 'channel' '<' genericParamList '>' -> 'channel' genericParamList
+		| ID '<' genericParamList '>' -> GENERIC_TYPE ID genericParamList
+		| ID;
 
-param 		: 'static' typeId name=ID
+paramStorageClass 
+	:	'static' | 'mobile' | -> 'mobile';
+
+param 		: paramStorageClass typeId name=ID
 		{
-		DanType varType = types.get($typeId.getText());
+		DanType varType = types.get($typeId.text);
 		if(varType == null){
 			// TODO add a type lookahead
-			throw new TypeException($typeId, "type is not defined");
+			throw new TypeException($typeId.text, "type is not defined");
 		}
-		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, varType, name));
-		} -> ^(STATIC_PARAM typeId $name)
-		| 'mobile'? typeId name=ID 
-		{
-		DanType varType = types.get($typeId.getText());
-		if(varType == null){
-			// TODO add a type lookahead
-			throw new TypeException($typeId, "type is not defined");
-		}
-		$procDec::paramList.add(new Vardec(Vardec.StgClass.Mobile, varType, name));
-		} -> ^(MOBILE_PARAM $typeId $name);
+		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, varType, $name));
+		} -> ^(PARAM typeId $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
 simple_statement 
 		: vardec_stmt STMT_END -> vardec_stmt
-			| send_stmt STMT_END -> send_stmt
-			| receive_stmt STMT_END -> receive_stmt
-			| assign_stmt STMT_END -> assign_stmt
-			| return_stmt STMT_END -> return_stmt
-			| call STMT_END -> call;
+		| send_stmt STMT_END -> send_stmt
+		| receive_stmt STMT_END -> receive_stmt
+		| assign_stmt STMT_END -> assign_stmt
+		| return_stmt STMT_END -> return_stmt
+		| call STMT_END -> call;
 
 block 		scope
 		{
@@ -325,7 +318,23 @@ succ_stmt	: 'succ' block -> ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile' | -> 'mobile';
 
-vardec_stmt 	: storageClass typeId name=ID
+vardec_stmt 	: storageClass typeId name=ID varInit
+		{
+		DanType varType = types.get($typeId.text);
+		if(varType == null){
+			// TODO add a type lookahead
+			System.out.println(
+				"unknown type:"
+				+ $typeId.text
+				+ " at "
+				+ $typeId.start.getLine() + ":" + $typeId.start.getPositionInLine()
+				);
+			++errorCount;
+		} else {
+			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
+		}
+		} -> ^(VARDEC storageClass typeId $name varInit);
+		/*| storageClass typeId name=ID '=' exp
 		{
 		DanType varType = types.get($typeId.getText());
 		if(varType == null){
@@ -340,23 +349,9 @@ vardec_stmt 	: storageClass typeId name=ID
 		} else {
 			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
 		}
-		} -> ^(VARDEC storageClass typeId $name)
-		| storageClass typeId name=ID '=' exp
-		{
-		DanType varType = types.get($typeId.getText());
-		if(varType == null){
-			// TODO add a type lookahead
-			System.out.println(
-				"unknown type:"
-				+ $typeId.text
-				+ " at "
-				+ $typeId.line + ":" + $typeId.pos
-				);
-			++errorCount;
-		} else {
-			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
-		}
-		} -> ^(VARDEC storageClass typeId $name exp);
+		} -> ^(VARDEC storageClass typeId $name exp);*/
+		
+varInit		: ('=' exp)? -> exp;
 
 
 send_stmt 	: ID '!' exp 
@@ -486,7 +481,7 @@ constructor	: 'new' '(' pool ')' typeId '(' arg_list ')'
 				+ $type.line + ":" + $type.pos);
 			++errorCount;
 		}
-		} -> ^(CONSTRUCTOR pool $type arg_list);
+		} -> ^(CONSTRUCTOR pool typeId arg_list);
 
 call 		: ID '(' arg_list ')' 
 		{
