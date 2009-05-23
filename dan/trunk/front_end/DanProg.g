@@ -5,26 +5,29 @@ grammar DanProg;
 options {output=AST;}
 tokens 
 {
-	PROGRAM;
-	IMPORTS;
+	ADORNMENTS;
+	ALL;
+	ARGLIST;
+	BLOCK;
 	BUNDLE_TYPEDEF;
 	BUNDLE_CHANNELS;
 	BUNDLE_PROTOCOL;
-	CHAN_DEF;
-	CONSTRUCTOR;
-	ALL;
-	ADORNMENTS;
-	DECLARATION;
-	PARAMLIST;
-	MOBILE_PARAM;
-	STATIC_PARAM;
-	BLOCK;
-	MOBILE_VARDEC;
-	STATIC_VARDEC;
-	LOCAL_VARDEC;
 	CALL;
-	ARGLIST;
+	CHAN_DEF;
+	CHAN_PARAMS;
+	CHAN_NOBUFFER;
+	CHAN_TYPE;
+	CONSTRUCTOR;
+	DECLARATION;
 	EXP;
+	GENERIC_TYPE;
+	GENERIC_PARAMLIST;
+	IMPORTS;
+	MOBILE_PARAM;
+	PARAMLIST;
+	PROGRAM;
+	STATIC_PARAM;
+	VARDEC;
 }
 
 
@@ -60,7 +63,7 @@ DanType getSymbolType(String id){
 // TODO quite a bit of common code here; find a way to simplify
 DanType searchForSymbolInBlock(String[] splitId){
 	for(int i = $block.size() - 1; i >= 0; --i){
-		for(Vardec v : $block[i]::symbols){
+		for(Vardec v : $block[i]::symbols.values()){
 			if(v.Name.getText().equals(splitId[0])){
 				if(splitId.length == 1)
 					return v.Type;
@@ -141,23 +144,21 @@ bundleDec
 	} -> ^('bundle' ID bundle_body);
 
 bundle_body 	: '{' channel_dec+ '}' -> ^(BUNDLE_CHANNELS channel_dec+);
+
+// an ID is only valid as a channel depth in a bundle declaration; the id must be a parameter in a
+// bundle constructor
+channel_depth	: 'unbounded' | INT_LIT | ID;
+
+channel_behavior
+	:	'block' | 'overflow' | 'overwrite' | 'priority';
+
+channel_params	: channel_depth ',' channel_behavior -> ^(CHAN_PARAMS channel_depth channel_behavior)
+		| channel_depth -> ^(CHAN_PARAMS channel_depth 'block')
+		| -> ^(CHAN_PARAMS CHAN_NOBUFFER 'block'); 
 	
-// TODO in the future the channel types can be defined in the bundle protocol specification to allow a channel to carry a sequence of types
-// TODO add channel buffer specification; i.e. blocking (default), overflowing, overwriting, buffer depth (int or unbounded (default is zero depth (synchronous))
-// overflowing and overwriting can only be used with fixed depth channels with depth > 0, not unbounded buffers 
-// depth 0 channels are always blocking
-channel_dec 	: 'channel' proto_type=ID name=ID channel_dir STMT_END 
+
+channel_dec 	: 'channel' '<' proto_type=ID '>' '(' channel_params ')' name=ID channel_dir STMT_END 
 	{
-	// TODO need to figure out how buffer size fits into this...
-	// can a bundle type have arbitrarily different buffer characteristics for each channel?
-	// is buffer size a constructor parameter, or part of the type?
-	// Would like bundle and channel end types to be independent of buffer characteristics,
-	// but would prefer not to have arbitrary buffering for a bundle type.
-	// Would it make sense for all elements of the bundle to have the same buffer characteristics?
-	// For single type protocols it probably makes most sense to have a constructor param for
-	// each single type channel.  More complex protocols may have buffer parameters that can be
-	// customized at runtime.  (Think of a sliding window protocol, where the receive buffer can
-	// be arbitrary, and where the ack channel may be buffered also.)
 	
 	// TODO the generic version of these types should be builtin types.
 	// For now we'll just search for the final type and add it if it isn't present yet,
@@ -202,8 +203,8 @@ channel_dec 	: 'channel' proto_type=ID name=ID channel_dir STMT_END
 		
 	}
 	ChanDec chanDec = new ChanDec(channelType, $name, $channel_dir.start);
-	Vardec writerDec = new Vardec(writerType, $name);
-	Vardec readerDec = new Vardec(readerType, $name);
+	Vardec writerDec = new Vardec(Vardec.StgClass.Static, writerType, $name);
+	Vardec readerDec = new Vardec(Vardec.StgClass.Static, readerType, $name);
 	
 	$bundleDec::channels.add(chanDec);
 	
@@ -257,25 +258,31 @@ procDec 	scope
 paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
+genericParamList
+	:	ID (',' ID)* -> ^(GENERIC_PARAMLIST ID+);
 
-param 		: 'static' type=ID name=ID
+typeId		: ID 
+		| type=ID '<' genericParamList '>' -> GENERIC_TYPE $type genericParamList
+		| 'channel' '<' protocol=ID '>' -> CHAN_TYPE $protocol;
+
+param 		: 'static' typeId name=ID
 		{
-		DanType varType = types.get($type.getText());
+		DanType varType = types.get($typeId.getText());
 		if(varType == null){
 			// TODO add a type lookahead
-			throw new TypeException($type, "type is not defined");
+			throw new TypeException($typeId, "type is not defined");
 		}
-		$procDec::paramList.add(new StaticVardec(varType, name));
-		} -> ^(STATIC_PARAM $type $name)
-		| 'mobile'? type=ID name=ID 
+		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, varType, name));
+		} -> ^(STATIC_PARAM typeId $name)
+		| 'mobile'? typeId name=ID 
 		{
-		DanType varType = types.get($type.getText());
+		DanType varType = types.get($typeId.getText());
 		if(varType == null){
 			// TODO add a type lookahead
-			throw new TypeException($type, "type is not defined");
+			throw new TypeException($typeId, "type is not defined");
 		}
-		$procDec::paramList.add(new Vardec(varType, name));
-		} -> ^(MOBILE_PARAM $type $name);
+		$procDec::paramList.add(new Vardec(Vardec.StgClass.Mobile, varType, name));
+		} -> ^(MOBILE_PARAM $typeId $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
@@ -289,16 +296,16 @@ simple_statement
 
 block 		scope
 		{
-		ArrayList<Vardec> symbols;
+		HashMap<String, Vardec> symbols;
 		}
 		@init
 		{
-		$block::symbols = new ArrayList<Vardec>();
+		$block::symbols = new HashMap<String, Vardec>();
 		}
 		: BLOCK_BEGIN statement+ BLOCK_END 
 		{
 		System.out.println("Symbols in the current block:");
-		for(Vardec v : $block::symbols){
+		for(Vardec v : $block::symbols.values()){
 			System.out.println("\t" + v.Type.getName() + " " + v.Name.getText() + "\n");
 		}
 		} -> ^(BLOCK statement+);
@@ -316,59 +323,40 @@ par_stmt	: 'par' block -> ^('par' block);
 
 succ_stmt	: 'succ' block -> ^('succ' block);
 
-vardec_stmt 	: 'static' type=ID name=ID
+storageClass	: 'static' | 'local' | 'mobile' | -> 'mobile';
+
+vardec_stmt 	: storageClass typeId name=ID
 		{
-		DanType varType = types.get($type.getText());
+		DanType varType = types.get($typeId.getText());
 		if(varType == null){
 			// TODO add a type lookahead
 			System.out.println(
 				"unknown type:"
-				+ $type.text
+				+ $typeId.text
 				+ " at "
-				+ $type.line + ":" + $type.pos
+				+ $typeId.line + ":" + $typeId.pos
 				);
 			++errorCount;
 		} else {
-			ArrayList<Vardec> symbols = $block::symbols;
-			symbols.add(new Vardec(Vardec.StorageClass.Static, varType, $name));
+			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
 		}
-		}
-		| 'local' type=ID name=ID
+		} -> ^(VARDEC storageClass typeId $name)
+		| storageClass typeId name=ID '=' exp
 		{
-		DanType varType = types.get($type.getText());
+		DanType varType = types.get($typeId.getText());
 		if(varType == null){
 			// TODO add a type lookahead
 			System.out.println(
 				"unknown type:"
-				+ $type.text
+				+ $typeId.text
 				+ " at "
-				+ $type.line + ":" + $type.pos
+				+ $typeId.line + ":" + $typeId.pos
 				);
 			++errorCount;
 		} else {
-			ArrayList<Vardec> symbols = $block::symbols;
-			symbols.add(new Vardec(Vardec.StorageClass.Local, varType, $name));
+			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
 		}
-		}
-		
-		| 'mobile'? type=ID name=ID 
-		{
-		DanType varType = types.get($type.getText());
-		if(varType == null){
-			// TODO add a type lookahead
-			System.out.println(
-				"unknown type:"
-				+ $type.text
-				+ " at "
-				+ $type.line + ":" + $type.pos
-				);
-			++errorCount;
-		} else {
-			ArrayList<Vardec> symbols = $block::symbols;
-			symbols.add(new Vardec(Vardec.StorageClass.Mobile, varType, $name));
-			
-		}
-		} -> ^(MOBILE_VARDEC $type $name);
+		} -> ^(VARDEC storageClass typeId $name exp);
 
 
 send_stmt 	: ID '!' exp 
@@ -461,12 +449,13 @@ atom 		: literal
 		}
 		}
 		| call 
-		| new
+		| constructor
 		| '(' exp ')' -> exp;
 		
 pool		: 'static' | 'local' | ID;
+
 		
-new		: 'new' '(' pool ')' type=ID '(' arg_list ')' 
+constructor	: 'new' '(' pool ')' typeId '(' arg_list ')' 
 		{
 		// type is a constructable type (right now limited to channels)
 		// pool is the location to allocate
