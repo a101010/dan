@@ -452,7 +452,7 @@ constructor	: 'new' '(' pool ')' typeId '(' arg_list ')'
 		//		at first)
 		//	<UserDefinedPool> - A custom pool specified by the user
 		// Right now we'll support static only, TODO the rest
-		if($pool.text != "static"){
+		if( ! $pool.text.equals("static") ){
 			System.out.println(
 				"unknown pool:"
 				+ $pool.text

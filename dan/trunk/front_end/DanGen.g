@@ -35,14 +35,14 @@ importStmt 	: ^('import' library=ID symbol=ID)
 		| ^('import' library=ID ALL)
 			-> importStmt(library={$library.text}, symbol={$ALL.text});
 		
-decs 		: (d+=declaration)+ -> template(decs={$d}) "<decs>";
+decs 		: (d+=declaration)+ -> template()"declarations" /*template(decs={$d}) "<decs>"*/;
    
-declaration	: ^(DECLARATION decChoice) -> template(dec={$decChoice.st}) "<dec>"
-		| ^(DECLARATION attribAdorn decChoice) -> adornedDec(attribs={$attribAdorn.st},
-								     dec={$decChoice.st});
+declaration	: ^(DECLARATION decChoice) -> /*template(dec={$decChoice.st}) "<dec>"*/
+		| ^(DECLARATION attribAdorn decChoice) /*-> adornedDec(attribs={$attribAdorn.st},
+								     dec={$decChoice.st})*/;
     
-decChoice 	: procDec -> template(dec={$procDec.st}) "<dec>"
-		| bundleDec -> template(dec={$bundleDec.st}) "<dec>";
+decChoice 	: procDec /*-> template(dec={$procDec.st}) "<dec>"*/
+		| bundleDec /*-> template(dec={$bundleDec.st}) "<dec>" */;
 
 bundleDec 	: ^('bundle' ID bundle_body);	
 
@@ -54,7 +54,7 @@ channel_dir 	: '->' | '<-';
 
 attrib 		: ID -> attrib(attribId={$ID.text});
 
-attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) -> template(attribs={$a}) "<attribs>";
+attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) /*-> template(attribs={$a}) "<attribs>"*/;
 
 procDec 	: ^('proc' returnType=ID name=ID paramList block) ;
 
