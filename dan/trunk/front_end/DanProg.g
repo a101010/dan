@@ -189,10 +189,10 @@ channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID
 		if(types.containsKey(readerEndName) || types.containsKey(writerEndName))
 			throw new RuntimeException("inconsistent channel type presence in types table");
 	
-		readerType = new ChannelReaderType($genericParamList.text);
-		writerType = new ChannelWriterType($genericParamList.text);
+		readerType = new ChannelReaderType($genericParamList.start);
+		writerType = new ChannelWriterType($genericParamList.start);
 		// TODO right now all channels are synchronous with zero depth
-		channelType = new ChannelType($genericParamList.text);
+		channelType = new ChannelType($genericParamList.start);
 		
 		
 		
@@ -272,7 +272,7 @@ param 		: paramStorageClass typeId name=ID
 		DanType varType = types.get($typeId.text);
 		if(varType == null){
 			// TODO add a type lookahead
-			throw new TypeException($typeId.text, "type is not defined");
+			throw new TypeException($typeId.start, "type is not defined");
 		}
 		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, varType, $name));
 		} -> ^(PARAM typeId $name);
@@ -327,7 +327,7 @@ vardec_stmt 	: storageClass typeId name=ID varInit
 				"unknown type:"
 				+ $typeId.text
 				+ " at "
-				+ $typeId.start.getLine() + ":" + $typeId.start.getPositionInLine()
+				+ $typeId.start.getLine() + ":" + $typeId.start.getCharPositionInLine()
 				);
 			++errorCount;
 		} else {
@@ -469,16 +469,16 @@ constructor	: 'new' '(' pool ')' typeId '(' arg_list ')'
 				"unknown pool:"
 				+ $pool.text
 				+ " at "
-				+ $pool.start.line + ":" + $pool.start.pos);
+				+ $pool.start.getLine() + ":" + $pool.start.getCharPositionInLine());
 			++errorCount;
 		}
-		DanType conType = types.get($type.text);
+		DanType conType = types.get($typeId.text);
 		if(conType == null){
 			System.out.println(
 				"unknown type: "
-				+ $type.text
+				+ $typeId.text
 				+ " at "
-				+ $type.line + ":" + $type.pos);
+				+ $typeId.start.getLine() + ":" + $typeId.start.getCharPositionInLine());
 			++errorCount;
 		}
 		} -> ^(CONSTRUCTOR pool typeId arg_list);
