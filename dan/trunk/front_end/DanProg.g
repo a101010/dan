@@ -258,7 +258,7 @@ paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
 genericParamList
-	:	typeId (',' typeId)* -> ^(GENERIC_PARAMLIST ID+);
+	:	typeId (',' typeId)* -> ^(GENERIC_PARAMLIST typeId+);
 
 typeId		: 'channel' '<' genericParamList '>' -> 'channel' genericParamList
 		| ID '<' genericParamList '>' -> GENERIC_TYPE ID genericParamList
