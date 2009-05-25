@@ -15,7 +15,7 @@
 #define saveState(state, label)				            \
 	do                                                  \
 	{										            \
-		unsigned int tstate = 0xdeadbeef;	            \
+		unsigned int tstate = 0xbeeffeed;	            \
 		__asm								            \
 		{									            \
 			__asm mov eax, offset label	                \
