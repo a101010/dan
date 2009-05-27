@@ -35,14 +35,14 @@ importStmt 	: ^('import' library=ID symbol=ID)
 		| ^('import' library=ID ALL)
 			-> importStmt(library={$library.text}, symbol={$ALL.text});
 		
-decs 		: (d+=declaration)+ -> template()"declarations" /*template(decs={$d}) "<decs>"*/;
+decs 		: (d+=declaration)+ -> template(decs={$d}) "<decs>";
    
-declaration	: ^(DECLARATION decChoice) -> /*template(dec={$decChoice.st}) "<dec>"*/
-		| ^(DECLARATION attribAdorn decChoice) /*-> adornedDec(attribs={$attribAdorn.st},
-								     dec={$decChoice.st})*/;
+declaration	: ^(DECLARATION decChoice) -> template(dec={$decChoice.st}) "<dec>"
+		| ^(DECLARATION attribAdorn decChoice) -> adornedDec(attribs={$attribAdorn.st},
+								     dec={$decChoice.st});
     
-decChoice 	: procDec /*-> template(dec={$procDec.st}) "<dec>"*/
-		| bundleDec /*-> template(dec={$bundleDec.st}) "<dec>" */;
+decChoice 	: procDec -> template(dec={$procDec.st}) "<dec>"
+		| bundleDec -> template(dec={"bundleDec"}) "<dec>"/*-> template(dec={$bundleDec.st}) "<dec>" */;
 
 bundleDec 	: ^('bundle' ID bundle_body);	
 
@@ -54,11 +54,61 @@ channel_dir 	: '->' | '<-';
 
 attrib 		: ID -> attrib(attribId={$ID.text});
 
-attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) /*-> template(attribs={$a}) "<attribs>"*/;
+attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) -> template(attribs={$a}) "<attribs>";
 
-procDec 	: ^('proc' returnType=ID name=ID paramList block) ;
+procDec 	scope
+		{
+			ArrayList<StringTemplate> locals;
+			ArrayList<StringTemplate> params;
+			ArrayList<StringTemplate> args;
+			ArrayList<StringTemplate> initLocals;
+			ArrayList<StringTemplate> cleanup;
+			ArrayList<StringTemplate> scratchInit;
+			boolean hasIo;
+			boolean hasPar;
+			
+			
+		}
+		@init
+		{
+			$procDec::locals = new ArrayList<StringTemplate>();
+			$procDec::params = new ArrayList<StringTemplate>();
+			$procDec::args = new ArrayList<StringTemplate>();
+			$procDec::initLocals = new ArrayList<StringTemplate>();
+			// TODO at the moment cleanup is only at the end of a proc
+			// and always occurs
+			// Need to allow ref types that are passed as messages or 
+			// one-way parameters to skip cleanup
+			// Would be nice if cleanup occurs on last use, rather than 
+			// at the end of the proc
+			$procDec::cleanup = new ArrayList<StringTemplate>();
+			$procDec::scratchInit = new ArrayList<StringTemplate>();
+			$procDec::hasIo = false;
+			$procDec::hasPar = false;
+		}
+		: ^('proc' returnType=ID name=ID paramList block) 
+		{
+			if($procDec::hasIo){
+				$procDec::scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
+	                        	new STAttrMap().put("scratchInit", "int result = 0; // for the result of read and write ops\n")));
+                        }
+                        if($procDec::hasPar){
+				$procDec::scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
+	                        	new STAttrMap().put("scratchInit", "int finished = 0; // for the number of procs in a par that have finished\n")));
+	                        $procDec::scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
+	                        	new STAttrMap().put("scratchInit", "int exceptions = 0; // for the number of procs in a par that threw exceptions\n")));                        	
+                        }
+		}-> procDec(
+			procType={$name},
+		        locals={"<locals>"},
+		        params={$paramList.st},
+		        args={"<args>"},
+		        initLocals={"<initLocals>"},
+		        procBodyScratchInit={$procDec::scratchInit},
+		        statements={$block.st},
+		        cleanup={"<cleanup>"}) ;
 
-paramList 	: ^(PARAMLIST param*);
+paramList 	: ^(PARAMLIST param*) -> template(params={"<params>"}) "<params>";
 
 genericParamList
 	:	^(GENERIC_PARAMLIST typeId+);
@@ -82,7 +132,7 @@ simple_statement
 			| return_stmt
 			| call;
 
-block 		: ^(BLOCK statement+);
+block 		: ^(BLOCK statement+) -> template(statements={"<statements>"}) "<statements>";
 
 while_stmt 	: ^('while' exp statement);
 
@@ -90,7 +140,7 @@ if_stmt		: ^('if' exp statement);
 
 cif_stmt 	: ^('cif' ID statement);
 
-par_stmt	: ^('par' block);
+par_stmt	: ^('par' block) { $procDec::hasPar = true;} ;
 
 succ_stmt	: ^('succ' block);
 
@@ -100,9 +150,9 @@ vardec_stmt 	: ^(VARDEC storageClass typeId name=ID varInit);
 
 varInit		: '=' exp | NO_INIT;
 
-send_stmt 	: ^('!' ID exp);
+send_stmt 	: ^('!' ID exp) { $procDec::hasIo = true; };
 
-receive_stmt	: ^('?' from=ID target=ID);
+receive_stmt	: ^('?' from=ID target=ID) { $procDec::hasIo = true; };
 
 assign_stmt 	: ^('=' ID exp);
 
