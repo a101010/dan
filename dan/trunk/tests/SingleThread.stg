@@ -241,19 +241,25 @@ int ChanWriteSync_BInt_c_0(BInt_chans * chans, void ** exception, proc * p, sche
 >>
 
 procDec(procType,
-        procDefines,
         locals,
         params,
+        args,
         initLocals,
-        stateLabels,
+        procBodyScratchInit,
+        statements,
         cleanup) ::= <<
 // ----------------------------------------------
 // <procType> PROC type
-<procDefines>
 typedef struct <procType>_locals_tag
 {
 	<locals>
 } <procType>_locals;
+
+typedef struct <procType>_proc_tag
+{
+    proc                        p;
+    <procType>_locals           locals;
+} <procType>_proc;
 
 // <procType>_locals constructor
 <procType>_locals * <procType>_locals_ctor(<procType>_locals * locals,
@@ -262,36 +268,44 @@ typedef struct <procType>_locals_tag
   <initLocals>
 }
 
-void <procType>_body(proc * p, scheduler * s)
+// <procType>_proc constructor
+<procType>_proc * <procType>_proc_ctor(<procType>_proc * proc,
+    <params; separator=", ">)
 {
-	int result;
-	int blocked = 0;
-
-	<procType>_locals * locals = (<procType>_locals*) p->locals;
-
-	while(!blocked)
-	{
-		switch(p->state)
-		{
-		<stateLabels>
-		default:
-			printf("Unsupported process state in <procType>_body: %d\n", p->state);
-			p->exception = "Unsupported process state in <procType>_body\n";
-			p->state = _PS_EXCEPTION_;
-			blocked = 1;
-		}
-	}
-
-	if((p->state == _PS_EXCEPTION_) || (p->state == _PS_CLEAN_EXIT_) )
-	{
-		<cleanup>
-	}
+    <procType>_locals_ctor(proc->locals, <args; separator=", ">);
+    proc_ctor(proc->p);
 }
 
+void <procType>_body(proc * ap, scheduler * s)
+{
+    <procBodyScratchInit>
+	
+    <procType>_proc* p = (<procType>_proc*) ap;
+	<procType>_locals* locals = &(p->locals);
+    if(ap->state != _PS_READY_TO_RUN_)
+        restoreState(ap->state);
 
+    <statements>
+	
+    ap->state = _PS_CLEAN_EXIT_;
+EXIT:
+    if((ap->state == _PS_EXCEPTION_) || (ap->state == _PS_CLEAN_EXIT_) )
+    {
+        <cleanup>
+    }
+}
 
 // End of <procType> PROC type
 
+
+>>
+
+procDecLite(procType, returnType, params, statements) ::= <<
+// TODO use procDecLite for procs that don't have par, fork, or do channel comms
+// <returnType> <procType>(<params; separator=", ">)
+/* 
+    <statements>
+*/
 
 >>
 
@@ -316,7 +330,7 @@ localValueDec(type, name) ::= <<
 >>
 
 localByRefDec(type, name) ::= <<
-<type> * <name>;
+<type> *<name>;
 
 >>
 
@@ -326,7 +340,139 @@ locals-><name> = <value>;
 >>
 
 
+constructLocal(type) ::= <<
+// TODO construct local <type>
+
+>>
+
+
 
 valueParam(type, name) ::= "<type> <name>"
 
-refParam(type, name) ::= "<type> * <name>"
+refParam(type, name) ::= "<type> *<name>"
+
+
+ifStatement(condition, statements) ::= <<
+if ( <condition> )
+{
+    <statements>
+}
+
+>>
+
+elseIfStatement(condition, statements) ::= <<
+else if ( <condition> )
+{
+    <statements>
+}
+
+>>
+
+elseStatement(condition, statements) ::= <<
+else
+{
+    <statments>
+}
+
+>>
+
+whileStatement(condition, statements) ::= <<
+while (<condition>)
+{
+    <statements>
+}
+
+>>
+
+receiveStatement(procType, chanr, target, labelNum, targetCleanup) ::= <<
+<targetCleanup>
+saveState(ap->state, <procType>_S<labelNum>);
+<target> = locals-><chanr>->read( locals-><chanr>->channel, &(locals-><target>), &ap->exception, ap, s);
+switch(result)
+{
+case 0 : // read value
+    printf("<procType>: read value %d from <chanr>\n", locals-><target>);
+    break;
+case 1 : // blocked
+    // let it read again
+    goto EXIT;
+case 2 : // exception
+    ap->state = _PS_EXCEPTION_;
+    goto EXIT;
+default:
+    printf("unexpected result from read on <chanr> in <procType>_body: %d\n", result);
+    ap->state = _PS_EXCEPTION_;
+    ap->exception = "unexpected result from read on <chanr> in <procType>_body";
+    goto EXIT;
+}
+
+>>
+
+sendStatement(procType, chanw, source, labelNum, sourceCleanup) ::= <<
+result = locals-><chanw>->write( locals-><chanw>->channel, locals-><source>, (void **) &ap->exception, ap, s);
+switch(result)
+{
+case 0 : // wrote value
+    printf("<procType>: wrote <source> to <chanw>\n", locals-><source>);
+    break;
+case 1 : // blocked
+    saveState(ap->state, <procType>_S<labelNum>);
+    if(result == 1)
+        goto EXIT;
+    result = locals-><chanw>->writeHandshake( locals-><chanw>->channel, (void **) &ap->exception, ap, s);
+    switch(result)
+    {
+    case 0 : // wrote value
+        printf("<procType>: wrote <source> to <chanw>\n", locals-><source>);
+        break;
+    case 1 : // blocked
+        goto EXIT;
+    case 2 : // exception
+        p->state = _PS_EXCEPTION_;
+        goto EXIT;
+    default:
+        printf("unexpected result from write to <chanw> in <procType>_body: %d\n", result);
+        ap->state = _PS_EXCEPTION_;
+        ap->exception = "unexpected result from write to <chanw> in <procType>_body";
+        goto EXIT;
+    }
+    break;
+case 2 : // exception
+    ap->state = _PS_EXCEPTION_;
+    goto EXIT;
+default:
+    printf("unexpected result from write to <chanw> in <procType>_body: %d\n", result);
+    ap->state = _PS_EXCEPTION_;
+    ap->exception = "unexpected result from write to <chanw> in <procType>_body";
+    goto EXIT;
+}
+<sourceCleanup>
+
+>>
+
+assignmentStatement(target, targetCleanup, source) ::= <<
+locals-><target> = <source>;
+<targetCleanup>
+
+>>
+
+binaryOp(left, right, op) ::= <<
+(left op right)
+>>
+
+unaryOp(op, operand) ::= <<
+(op operand)
+>>
+
+simpleStatement(statement) ::= <<
+<statement>;
+
+>>
+
+functionCall(function, args) ::= <<
+<function>(<args; separator=", ">)
+>>
+
+parStatement() ::= <<
+
+>>
