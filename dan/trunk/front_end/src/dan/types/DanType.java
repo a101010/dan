@@ -1,5 +1,6 @@
 package dan.types;
 
+import java.util.ArrayList;
 import org.antlr.runtime.Token;
 import dan.system.*;
 
@@ -34,9 +35,10 @@ public class DanType {
     }
             
     protected Token token;
+    protected ArrayList<DanType> genericArgs;
     
     public DanType(){
-        
+       
     }
     
     public DanType(Token t) {
@@ -73,6 +75,13 @@ public class DanType {
 
     public boolean isByRef(){
         return true;
+    }
+
+    public ArrayList<DanType> getGenericArgs(){
+        if(genericArgs == null){
+            genericArgs = new ArrayList<DanType>();
+        }
+        return genericArgs;
     }
     
 }
