@@ -108,19 +108,33 @@ procDec 	scope
 		        statements={$block.st},
 		        cleanup={"<cleanup>"}) ;
 
-paramList 	: ^(PARAMLIST param*) -> template(params={"<params>"}) "<params>";
+paramList 	: ^(PARAMLIST rameses+=param*) -> template(params={$rameses}) "<params>";
 
 genericParamList
 	:	^(GENERIC_PARAMLIST typeId+);
 	
-typeId		: ID
-		| 'channel' genericParamList 
-		| GENERIC_TYPE ID genericParamList;
+typeId		: ID { System.out.println("type is " + $ID); }
+		| 'channel' genericParamList { System.out.println("type is channel<" + $genericParamList.text + ">"); }
+		| 'chanr' genericParamList { System.out.println("type is chanr<" + $genericParamList.text + ">"); }
+		| 'chanw' genericParamList { System.out.println("type is chanw<" + $genericParamList.text + ">"); }
+		| GENERIC_TYPE ID genericParamList {System.out.println("type is " + $ID + "<" + $genericParamList.text + ">"); };
 		
 paramStorageClass
 	:	'static' | 'mobile';
 
-param 		: ^(PARAM paramStorageClass typeId name=ID);
+param 		: ^(PARAM paramStorageClass typeId name=ID) 
+		{
+			/*StringTemplate paramTemplate;
+			DanType paramType = types.get($typeId.text);
+			if(paramType.isByRef()){
+				paramTemplate = templateLib.getInstanceOf("refParameter",
+					new STAttrMap().put("type", paramType.getEmittedType()).put("name", $name));
+			} else {
+				paramTemplate = templateLib.getInstanceOf("valueParameter", 
+					new STAttrMap().put("type", paramType.getEmittedType()).put("name", $name));
+			}
+			retval.st = paramTemplate;*/
+		};
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 

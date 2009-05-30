@@ -42,6 +42,7 @@ import dan.system.*;
 @members 
 {
 public HashMap<String, DanType> types = new HashMap<String, DanType>();
+public HashMap<String, ArrayList<Token>> unresolvedTypes = new HashMap<String, DanType>();
 
 public int errorCount = 0;
 
@@ -164,24 +165,26 @@ channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID
 	// TODO the generic version of these types should be builtin types.
 	// For now we'll just search for the final type and add it if it isn't present yet,
 	// but reuse it if it is.
+	// TODO simply using the $genericParamList.text may not result in an exact match
 	String readerEndName = "chanr<" + $genericParamList.text + ">";
 	String writerEndName = "chanw<" + $genericParamList.text + ">";
+	// TODO simply using $channel_params.text may not result in an exact match
 	String channelName = "channel<" + $genericParamList.text + ">(" + $channel_params.text + ")";
 	// all three should either be defined or not; it would be an error for one of them
 	// to be in the symbol table but not the others
-	ChannelReaderType readerType;
-	ChannelWriterType writerType;
+	ChanRType readerType;
+	ChanWType writerType;
 	ChannelType channelType;
 	if(types.containsKey(channelName)){
 		channelType = (ChannelType) types.get(channelName);
 		if(types.containsKey(readerEndName)){
-			readerType = (ChannelReaderType) types.get(readerEndName);
+			readerType = (ChanRType) types.get(readerEndName);
 			
 		} else{
 			throw new RuntimeException("inconsistent channel type presence in types table");
 		}
 		if(types.containsKey(writerEndName)){
-			writerType = (ChannelWriterType) types.get(writerEndName);
+			writerType = (ChanWType) types.get(writerEndName);
 		} else {
 			throw new RuntimeException("inconsistent channel type presence in types table");
 		}
@@ -191,8 +194,9 @@ channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID
 		if(types.containsKey(readerEndName) || types.containsKey(writerEndName))
 			throw new RuntimeException("inconsistent channel type presence in types table");
 	
-		readerType = new ChannelReaderType($genericParamList.start);
-		writerType = new ChannelWriterType($genericParamList.start);
+		// TODO use new constructors
+		readerType = new ChanRType($genericParamList.start);
+		writerType = new ChanWType($genericParamList.start);
 		// TODO right now all channels are synchronous with zero depth
 		channelType = new ChannelType($genericParamList.start);
 		
@@ -247,8 +251,12 @@ procDec 	scope
 		
 		DanType returnType = types.get($ret.getText());
 		if(returnType == null){
-			// TODO add a type lookahead
-			throw new TypeException($ret, "return type is not defined");
+			ArrayList<Token> typeRefs = unresolvedTypes.get($ret.getText());
+			if(typeRefs == null){
+				typeRefs = new ArrayList<Token>();
+				unresolvedTypes.put($ret.getText(), typeRefs);
+			}
+			typeRefs.add($ret);
 		}
 		
 		// TODO add the parameters
@@ -264,6 +272,8 @@ genericParamList
 	:	typeId (',' typeId)* -> ^(GENERIC_PARAMLIST typeId+);
 
 typeId		: 'channel' '<' genericParamList '>' -> 'channel' genericParamList
+		| 'chanr' '<' genericParamList '>' -> 'chanr' genericParamList
+		| 'chanw' '<' genericParamList '>' -> 'chanw' genericParamList
 		| ID '<' genericParamList '>' -> GENERIC_TYPE ID genericParamList
 		| ID;
 
