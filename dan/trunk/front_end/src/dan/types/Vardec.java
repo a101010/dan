@@ -18,12 +18,12 @@ public class Vardec {
         Mobile
     }
 
-    public final DanType Type;
+    public final TypeRef Type;
     public final Token Name;
     public final StgClass StorageClass;
     
     
-    public Vardec(StgClass storageClass, DanType type, Token name){
+    public Vardec(StgClass storageClass, TypeRef type, Token name){
         StorageClass = storageClass;
         Type = type;
         Name = name;

@@ -20,7 +20,7 @@ tokens
 	DECLARATION;
 	EXP;
 	GENERIC_TYPE;
-	GENERIC_PARAMLIST;
+	GENERIC_ARGLIST;
 	IMPORTS;
 	NO_ARG;
 	NO_INIT;
@@ -42,10 +42,18 @@ import dan.system.*;
 @members 
 {
 public HashMap<String, DanType> types = new HashMap<String, DanType>();
-public HashMap<String, ArrayList<Token>> unresolvedTypes = new HashMap<String, DanType>();
+public HashMap<String, ArrayList<TypeRef>> typeRefs = new HashMap<String, ArrayList<TypeRef>>();
 
 public int errorCount = 0;
 
+void addTypeRef(TypeRef t){
+	ArrayList<TypeRef> refs = typeRefs.get(t.toString());
+	if(refs == null){
+		refs = new ArrayList<TypeRef>();
+		typeRefs.put(t.toString(), refs);
+	}
+	refs.add(t);
+}
 
 /**
   * Get the type of the symbol; null if not defined.
@@ -145,7 +153,7 @@ bundleDec
 	}
 	} -> ^('bundle' ID bundle_body);
 
-bundle_body 	: '{' channel_dec+ '}' -> ^(BUNDLE_CHANNELS channel_dec+);
+bundle_body 	: '{' channelDec+ '}' -> ^(BUNDLE_CHANNELS channelDec+);
 
 // an ID is only valid as a channel depth in a bundle declaration; the id must be a parameter in a
 // bundle constructor
@@ -159,17 +167,34 @@ channel_params	: channel_depth ',' channel_behavior -> ^(CHAN_PARAMS channel_dep
 		| -> ^(CHAN_PARAMS CHAN_NOBUFFER 'block'); 
 	
 
-channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID channel_dir STMT_END 
+channelDec 	 
+	scope 
+	{
+		ArrayList<DanType> protocol;
+		ChannelType.ChanDepth chanDepth1;
+		Integer chanDepth2;
+		Token chanDepth3;
+		ChannelType.ChanBehavior chanBehavior;
+	}
+	@init
+	{
+		$channelDec::protocol = new ArrayList<DanType>();
+		$channelDec::chanDepth1 = ChannelType.ChanDepth.finite;
+		$channelDec::chanDepth2 = 0;
+		$channelDec::chanDepth3 = null;
+		$channelDec::chanBehavior = ChannelType.ChanBehavior.block;
+	}
+	: 'channel' '<' genericArgList '>' '(' channel_params ')' name=ID channel_dir STMT_END 
 	{
 	
 	// TODO the generic version of these types should be builtin types.
 	// For now we'll just search for the final type and add it if it isn't present yet,
 	// but reuse it if it is.
 	// TODO simply using the $genericParamList.text may not result in an exact match
-	String readerEndName = "chanr<" + $genericParamList.text + ">";
-	String writerEndName = "chanw<" + $genericParamList.text + ">";
+	String readerEndName = "chanr<" + $genericArgList.text + ">";
+	String writerEndName = "chanw<" + $genericArgList.text + ">";
 	// TODO simply using $channel_params.text may not result in an exact match
-	String channelName = "channel<" + $genericParamList.text + ">(" + $channel_params.text + ")";
+	String channelName = "channel<" + $genericArgList.text + ">(" + $channel_params.text + ")";
 	// all three should either be defined or not; it would be an error for one of them
 	// to be in the symbol table but not the others
 	ChanRType readerType;
@@ -194,12 +219,15 @@ channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID
 		if(types.containsKey(readerEndName) || types.containsKey(writerEndName))
 			throw new RuntimeException("inconsistent channel type presence in types table");
 	
-		// TODO use new constructors
-		readerType = new ChanRType($genericParamList.start);
-		writerType = new ChanWType($genericParamList.start);
-		// TODO right now all channels are synchronous with zero depth
-		channelType = new ChannelType($genericParamList.start);
 		
+		readerType = new ChanRType($channelDec::protocol);
+		writerType = new ChanWType($channelDec::protocol);
+		// TODO right now all channels are synchronous with zero depth
+		channelType = new ChannelType(	$channelDec::protocol, 
+						$channelDec::chanDepth1,
+						$channelDec::chanDepth2,
+						$channelDec::chanDepth3,
+						$channelDec::chanBehavior);
 		
 		
 		types.put(channelType.getName(), channelType);
@@ -226,7 +254,7 @@ channel_dec 	: 'channel' '<' genericParamList '>' '(' channel_params ')' name=ID
 	// (which may require a rule without the channel_dir)
 	
 	
-	} -> ^('channel' genericParamList $name channel_dir);
+	} -> ^('channel' genericArgList $name channel_dir);
 	
 channel_dir 	: '->' | '<-';
 
@@ -243,39 +271,58 @@ procDec 	scope
 		{
 		$procDec::paramList = new ArrayList<Vardec>();
 		}
-		: 'proc' ret=ID name=ID '(' paramList ')' block 
+		: 'proc' typeId name=ID '(' paramList ')' block // TODO add a generic paramlist
 		{
-		if(types.containsKey($name))
-			throw new TypeException($name, "proc type is already defined");
-		
-		
-		DanType returnType = types.get($ret.getText());
-		if(returnType == null){
-			ArrayList<Token> typeRefs = unresolvedTypes.get($ret.getText());
-			if(typeRefs == null){
-				typeRefs = new ArrayList<Token>();
-				unresolvedTypes.put($ret.getText(), typeRefs);
-			}
-			typeRefs.add($ret);
+		if(types.containsKey($name)){
+			System.out.println "proc type " + $name.txt " is already defined: " + $name.line + ":" + $name.pos);
+			++errorCount;
+		} else {
+			// TODO add the parameters
+			ProcType procType = new ProcType($name, $typeId.t);
+			procType.Params = $procDec::paramList;	
+			types.put(procType.getName(), procType);	
 		}
-		
-		// TODO add the parameters
-		ProcType procType = new ProcType($name, returnType);
-		procType.Params = $procDec::paramList;	
-		types.put(procType.getName(), procType);	
 		} -> ^('proc' ID ID paramList block);
 
 paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
-genericParamList
-	:	typeId (',' typeId)* -> ^(GENERIC_PARAMLIST typeId+);
+genericArgList returns [ArrayList<TypeRef> t]
+	:	typeIds+=typeId (',' typeIds+=typeId)* 
+	{
+		ArrayList<TypeRef> args = new ArrayList<TypeRef>();
+		for(t: $typeIds){
+			args.add(t.retval.t);
+		}
+		$t = args;
+	} -> ^(GENERIC_ARGLIST typeId+);
 
-typeId		: 'channel' '<' genericParamList '>' -> 'channel' genericParamList
-		| 'chanr' '<' genericParamList '>' -> 'chanr' genericParamList
-		| 'chanw' '<' genericParamList '>' -> 'chanw' genericParamList
-		| ID '<' genericParamList '>' -> GENERIC_TYPE ID genericParamList
-		| ID;
+typeId	returns [TypeRef t]
+	: token='channel' '<' genericArgList '>' 
+	{
+		$t = new TypeRef($token, $genericArgList.t);
+		addTypeRef($t);
+	} -> 'channel' genericArgList
+	| token='chanr' '<' genericArgList '>' 
+	{
+		$t = new TypeRef($token, $genericArgList.t);
+		addTypeRef($t);
+	} -> 'chanr' genericArgList
+	| token='chanw' '<' genericArgList '>' 
+	{
+		$t = new TypeRef($token, $genericArgList.t);
+		addTypeRef($t);
+	} -> 'chanw' genericArgList
+	| token=ID '<' genericArgList '>' 
+	{
+		$t = new TypeRef($token, $genericArgList.t);
+		addTypeRef($t);
+	} -> GENERIC_TYPE ID genericArgList
+	| ID
+	{
+		$t = new TypeRef($ID);
+		addTypeRef($t);
+	};
 
 paramStorageClass 
 	:	'static' | 'mobile' | -> 'mobile';
@@ -435,7 +482,7 @@ atom 		: literal
 		if(varType == null){
 			System.out.println(
 				"variable is not defined or is not in scope: "
-				+ $ID.text
+								+ $ID.text
 				+ " at "
 				+ $ID.line + ":" + $ID.pos);
 			++errorCount;

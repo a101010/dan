@@ -6,6 +6,7 @@
 package dan.types;
 
 import java.util.ArrayList;
+import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
 
 /**
@@ -21,16 +22,18 @@ public class ChannelType extends DanType {
 
     protected ChanDepth chanDepth1;
     protected int chanDepth2;
+    protected Token chanDepth3;
     protected ChanBehavior chanBehavior;
     protected String strRep;
     protected String emittedTypeRep;
 
 
-    public ChannelType(ArrayList<DanType> p, ChanDepth d1, int d2, ChanBehavior b){
+    public ChannelType(ArrayList<TypeRef> p, ChanDepth d1, int d2, Token d3, ChanBehavior b){
         super(new CommonToken(ChannelTokenId, "'channel'"));
         genericArgs = p;
         chanDepth1 = d1;
         chanDepth2 = d2;
+        chanDepth3 = d3;
         chanBehavior = b;
     }
     
@@ -70,7 +73,7 @@ public class ChannelType extends DanType {
         if(emittedTypeRep == null){
             emittedTypeRep = "Channel_";
             for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).getEmittedType();
+                emittedTypeRep += genericArgs.get(i).getResolvedType().getEmittedType();
                 emittedTypeRep += "_";
             }
             emittedTypeRep += (chanDepth1 == ChanDepth.unbounded ? chanDepth1 : chanDepth2).toString()

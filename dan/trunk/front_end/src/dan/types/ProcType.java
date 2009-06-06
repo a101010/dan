@@ -30,10 +30,10 @@ public class ProcType extends DanType {
             throw new TypeException(t, "Proc type names may not contain '.'");
     }
     public ArrayList<Vardec> Params;
-    public DanType ReturnType;
+    public TypeRef ReturnType;
     //public ArrayList<CallNode> callChains;  // no call chains in commstime3 example
     
-    public ProcType(Token name, DanType returnType){
+    public ProcType(Token name, TypeRef returnType){
         super(name);
         ValidateName(name);
         ReturnType = returnType;
