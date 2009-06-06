@@ -35,7 +35,7 @@ public class DanType {
     }
             
     protected Token token;
-    protected ArrayList<DanType> genericArgs;
+    protected ArrayList<TypeRef> genericArgs;
     
     public DanType(){
        
@@ -77,10 +77,7 @@ public class DanType {
         return true;
     }
 
-    public ArrayList<DanType> getGenericArgs(){
-        if(genericArgs == null){
-            genericArgs = new ArrayList<DanType>();
-        }
+    public ArrayList<TypeRef> getGenericArgs(){
         return genericArgs;
     }
     
