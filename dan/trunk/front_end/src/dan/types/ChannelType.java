@@ -15,8 +15,30 @@ import org.antlr.runtime.CommonToken;
  */
 public class ChannelType extends DanType {
 
-    public enum ChanBehavior { block, overflow, overwrite, priority }
-    public enum ChanDepth { unbounded, finite }
+    public enum ChanBehavior {
+        block,      // when the channel is full, the writer must block
+                    //(Note: this is the only valid value if chanDepth1 is finite
+                    // and chanDepth2 is zero, or chanDepth1 is parameterized and
+                    // zero is supplied as the argument in the bundle constructor)
+        overflow,   // when the channel is full, additional messages are lost
+        overwrite,  // when the channel is full, the oldest message is overwritten
+        priority    // when the channel is full, the lowest priority message is overwritten
+                    // Note: this requires a prioritized protocol
+    }
+    public enum ChanDepth { 
+        unbounded,  // the channel does not have a finite buffer; the buffer
+                    // may grow without bound (this is always dynamically
+                    // allocated
+        finite,     // the channel has a pre-allocated buffer of fixed size
+                    // the size is given in chanDepth2
+        id          // the channel's depth is given by an argument
+                    // which can be a symbolic constant, a bundle
+                    // constructor parameter, or a runtime variable of
+                    // integer type.  A bundle constructor parameter
+                    // must resolve to either a constant or an integer.
+                    // A runtime value can only be used with a dynamically
+                    // allocated channel.
+    }
 
     static public int ChannelTokenId = 0;
 
@@ -60,8 +82,28 @@ public class ChannelType extends DanType {
         return chanDepth1;
     }
 
+    /**
+     * Gets chanDepth2.
+     * chanDepth2 is an integer representing the size of the channel buffer.
+     * Zero means the channel is fully synchronous; the writer must block
+     * until the reader has read the channel.
+     * Only valid if chanDepth1 == finite.
+     * @return
+     */
     public int getChanDepth2(){
         return chanDepth2;
+    }
+
+    /**
+     * Gets chanDepth3.
+     * chanDepth3 represents the token of the bundle parameter
+     * which will be used to specify either an integer or the keyword
+     * 'unbounded'.  Only valid in channel bundle declarations.  Only valid
+     * if chanDepth1 == parameterized.
+     * @return
+     */
+    public Token getChanDepth3(){
+        return chanDepth3;
     }
 
     public ChanBehavior getChanBehavior(){

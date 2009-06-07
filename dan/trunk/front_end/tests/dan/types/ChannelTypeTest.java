@@ -129,4 +129,9 @@ public class ChannelTypeTest {
         System.out.println("c2 result == " + result);
     }
 
+    @Test
+    public void testInt() {
+        int foo = Integer.parseInt("5");
+    }
+
 }

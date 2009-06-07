@@ -26,6 +26,10 @@ public class TypeRef {
         genArgs = ga;
     }
 
+    public TypeRef(Token n){
+        name = n;
+    }
+
     public Token getName(){
         return name;
     }
