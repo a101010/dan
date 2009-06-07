@@ -20,7 +20,7 @@ public class ChanRType extends DanType {
      *
      * @param p The channel protocol
      */
-    public ChanRType(ArrayList<DanType> p){
+    public ChanRType(ArrayList<TypeRef> p){
         super(new CommonToken(ChanrTokenId, "'chanr'"));
         genericArgs = p;
     }
@@ -45,7 +45,7 @@ public class ChanRType extends DanType {
         if(emittedTypeRep == null){
             emittedTypeRep = "ChanR_";
             for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).getEmittedType();
+                emittedTypeRep += genericArgs.get(i).resolvedType.getEmittedType();
                 if(i != genericArgs.size() - 1)
                     emittedTypeRep += "_";
             }

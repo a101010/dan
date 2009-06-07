@@ -31,6 +31,15 @@ tokens
 	VARINIT;
 }
 
+// this has to be a global scope because typeId isn't always called from genericArcList
+// and there doesn't seem to be any way to harvest the return value of typeId in a list
+// context (the += operator just collects tokens or trees if output=AST is enabled)
+// TODO file a bug or enhancement request to allow accessing a list of return values from
+// the += operator
+scope TypeIdScope 
+{
+	ArrayList<TypeRef> typeRefs;
+}
 
 @header 
 {
@@ -100,7 +109,14 @@ DanType searchForSymbolInStaticMembers(String id){
 	
 }
 
-prog		: imports decs;
+
+
+prog		scope TypeIdScope; // so there will always be a TypeIdScope for typeId to add to, even if we ignore it
+		@init
+		{
+			$TypeIdScope::typeRefs = new ArrayList<TypeRef>();
+		}
+		: imports decs;
 
 
 imports 	: importStmt* -> ^(IMPORTS importStmt*);
@@ -277,13 +293,14 @@ paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
 genericArgList returns [ArrayList<TypeRef> tRefs]
+	scope TypeIdScope;
+	@init
+	{
+		$TypeIdScope::typeRefs = new ArrayList<TypeRef>();
+	}
 	:	typeIds+=typeId (',' typeIds+=typeId)* 
 	{
-		ArrayList<TypeRef> args = new ArrayList<TypeRef>();
-		/*for(Tree typeIdTree: $typeIds){
-			args.add(typeIdTree.retval.t);
-		}*/
-		$tRefs = args;
+		$tRefs = $TypeIdScope::typeRefs;
 	} -> ^(GENERIC_ARGLIST typeId+);
 
 typeId	returns [TypeRef t]
@@ -291,26 +308,31 @@ typeId	returns [TypeRef t]
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
+		$TypeIdScope::typeRefs.add($t);
 	} -> 'channel' genericArgList
 	| token='chanr' '<' genericArgList '>' 
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
+		$TypeIdScope::typeRefs.add($t);
 	} -> 'chanr' genericArgList
 	| token='chanw' '<' genericArgList '>' 
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
+		$TypeIdScope::typeRefs.add($t);
 	} -> 'chanw' genericArgList
 	| token=ID '<' genericArgList '>' 
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
+		$TypeIdScope::typeRefs.add($t);
 	} -> GENERIC_TYPE ID genericArgList
 	| ID
 	{
 		$t = new TypeRef($ID);
 		addTypeRef($t);
+		$TypeIdScope::typeRefs.add($t);
 	};
 
 paramStorageClass 

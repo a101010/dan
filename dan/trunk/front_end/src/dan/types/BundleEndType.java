@@ -37,7 +37,7 @@ public class BundleEndType extends DanType {
         DanType member = null;
         for(Vardec v : ChanEnds){
             if(v.Name.getText().equals(splitId[0])){
-                member = v.Type;
+                member = v.Type.getResolvedType();
                 break;
             }
         }
