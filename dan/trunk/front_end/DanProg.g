@@ -55,9 +55,7 @@ void addTypeRef(TypeRef t){
 	refs.add(t);
 }
 
-/**
-  * Get the type of the symbol; null if not defined.
-  */
+/* TODO these may belong on DanType; however needs to be updated to use TypeRef and can't use it on the first pass
 DanType getSymbolType(String id){
 	String[] splitId = id.split("\\.");
 	DanType t = searchForSymbolInBlock(splitId);
@@ -98,7 +96,7 @@ DanType searchForSymbolInParamList(String[] splitId){
 DanType searchForSymbolInStaticMembers(String id){
 	throw new NotImplementedException();
 }
-
+*/
 	
 }
 
@@ -157,34 +155,77 @@ bundle_body 	: '{' channelDec+ '}' -> ^(BUNDLE_CHANNELS channelDec+);
 
 // an ID is only valid as a channel depth in a bundle declaration; the id must be a parameter in a
 // bundle constructor
-channel_depth	: 'unbounded' | INT_LIT | ID;
+channel_depth	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3]
+	: 'unbounded' 
+	{
+		$cd1 = ChannelType.ChanDepth.unbounded;
+		$cd2 = 0;
+		$cd3 = null;
+	}
+	| INT_LIT 
+	{
+		$cd1 = ChannelType.ChanDepth.finite;
+		try {
+			//$cd2 = Integer.parseInt($INT_LIT);
+			if($cd2 < 0)
+				throw new IllegalArgumentException("must be a whole number (i.e. {0, 1, 2, ...})");
+		} catch (Exception ex) {
+			System.out.println("Invalid chan depth: " + $INT_LIT + " : must be a whole number (i.e. {0, 1, 2, ...})");
+			++errorCount;
+		}
+		$cd3 = null;
+	}
+	| ID
+	{
+		$cd1 = ChannelType.ChanDepth.id;
+		$cd2 = 0;
+		$cd3 = $ID;
+	};
 
-channel_behavior
-	:	'block' | 'overflow' | 'overwrite' | 'priority';
+channel_behavior   returns [ChannelType.ChanBehavior b]
+	: 'block'
+	{
+		$b = ChannelType.ChanBehavior.block;
+	} 
+	| 'overflow' 
+	{
+		$b = ChannelType.ChanBehavior.overflow;
+	} 
+	| 'overwrite' 
+	{
+		$b = ChannelType.ChanBehavior.overwrite;
+	} 
+	| 'priority'
+	{
+		$b = ChannelType.ChanBehavior.priority;
+	};
 
-channel_params	: channel_depth ',' channel_behavior -> ^(CHAN_PARAMS channel_depth channel_behavior)
-		| channel_depth -> ^(CHAN_PARAMS channel_depth 'block')
-		| -> ^(CHAN_PARAMS CHAN_NOBUFFER 'block'); 
+channel_args	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3, ChannelType.ChanBehavior b]
+		: channel_depth ',' channel_behavior 
+		{ 
+			$cd1 = $channel_depth.cd1;
+			$cd2 = $channel_depth.cd2;
+			$cd3 = $channel_depth.cd3;
+			$b = $channel_behavior.b;
+		} -> ^(CHAN_PARAMS channel_depth channel_behavior)
+		| channel_depth 
+		{
+			$cd1 = $channel_depth.cd1;
+			$cd2 = $channel_depth.cd2;
+			$cd3 = $channel_depth.cd3;
+			$b = ChannelType.ChanBehavior.block;
+		} -> ^(CHAN_PARAMS channel_depth 'block')
+		| 
+		{
+			$cd1 = ChannelType.ChanDepth.finite;
+			$cd2 = 0;
+			$cd3 = null;
+			$b = ChannelType.ChanBehavior.block;
+		} -> ^(CHAN_PARAMS CHAN_NOBUFFER 'block'); 
 	
 
-channelDec 	 
-	scope 
-	{
-		ArrayList<DanType> protocol;
-		ChannelType.ChanDepth chanDepth1;
-		Integer chanDepth2;
-		Token chanDepth3;
-		ChannelType.ChanBehavior chanBehavior;
-	}
-	@init
-	{
-		$channelDec::protocol = new ArrayList<DanType>();
-		$channelDec::chanDepth1 = ChannelType.ChanDepth.finite;
-		$channelDec::chanDepth2 = 0;
-		$channelDec::chanDepth3 = null;
-		$channelDec::chanBehavior = ChannelType.ChanBehavior.block;
-	}
-	: 'channel' '<' genericArgList '>' '(' channel_params ')' name=ID channel_dir STMT_END 
+channelDec
+	: 'channel' '<' genericArgList '>' '(' channel_args ')' name=ID channel_dir STMT_END 
 	{
 	
 	// TODO the generic version of these types should be builtin types.
@@ -194,64 +235,12 @@ channelDec
 	String readerEndName = "chanr<" + $genericArgList.text + ">";
 	String writerEndName = "chanw<" + $genericArgList.text + ">";
 	// TODO simply using $channel_params.text may not result in an exact match
-	String channelName = "channel<" + $genericArgList.text + ">(" + $channel_params.text + ")";
+	String channelName = "channel<" + $genericArgList.text + ">(" + $channel_args.text + ")";
 	// all three should either be defined or not; it would be an error for one of them
 	// to be in the symbol table but not the others
 	ChanRType readerType;
 	ChanWType writerType;
 	ChannelType channelType;
-	if(types.containsKey(channelName)){
-		channelType = (ChannelType) types.get(channelName);
-		if(types.containsKey(readerEndName)){
-			readerType = (ChanRType) types.get(readerEndName);
-			
-		} else{
-			throw new RuntimeException("inconsistent channel type presence in types table");
-		}
-		if(types.containsKey(writerEndName)){
-			writerType = (ChanWType) types.get(writerEndName);
-		} else {
-			throw new RuntimeException("inconsistent channel type presence in types table");
-		}
-	}
-	else {
-		// sanity check; none of them should have been defined
-		if(types.containsKey(readerEndName) || types.containsKey(writerEndName))
-			throw new RuntimeException("inconsistent channel type presence in types table");
-	
-		
-		readerType = new ChanRType($channelDec::protocol);
-		writerType = new ChanWType($channelDec::protocol);
-		// TODO right now all channels are synchronous with zero depth
-		channelType = new ChannelType(	$channelDec::protocol, 
-						$channelDec::chanDepth1,
-						$channelDec::chanDepth2,
-						$channelDec::chanDepth3,
-						$channelDec::chanBehavior);
-		
-		
-		types.put(channelType.getName(), channelType);
-		types.put(readerType.getName(), readerType);
-		types.put(writerType.getName(), writerType);
-		
-	}
-	ChanDec chanDec = new ChanDec(channelType, $name, $channel_dir.start);
-	Vardec writerDec = new Vardec(Vardec.StgClass.Static, writerType, $name);
-	Vardec readerDec = new Vardec(Vardec.StgClass.Static, readerType, $name);
-	
-	$bundleDec::channels.add(chanDec);
-	
-	if($channel_dir.start.getText() == "->"){
-		$bundleDec::writerEnds.add(writerDec);
-		$bundleDec::readerEnds.add(readerDec);
-	}
-	else {
-		$bundleDec::writerEnds.add(readerDec);
-		$bundleDec::readerEnds.add(writerDec);
-	}
-	
-	// TODO eventually we need to handle the case where there is no enclosing bundle type
-	// (which may require a rule without the channel_dir)
 	
 	
 	} -> ^('channel' genericArgList $name channel_dir);
@@ -274,7 +263,7 @@ procDec 	scope
 		: 'proc' typeId name=ID '(' paramList ')' block // TODO add a generic paramlist
 		{
 		if(types.containsKey($name)){
-			System.out.println "proc type " + $name.txt " is already defined: " + $name.line + ":" + $name.pos);
+			System.out.println("proc type " + $name.text +  " is already defined: " + $name.line + ":" + $name.pos);
 			++errorCount;
 		} else {
 			// TODO add the parameters
@@ -287,35 +276,35 @@ procDec 	scope
 paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
 			| -> PARAMLIST;
 
-genericArgList returns [ArrayList<TypeRef> t]
+genericArgList returns [ArrayList<TypeRef> tRefs]
 	:	typeIds+=typeId (',' typeIds+=typeId)* 
 	{
 		ArrayList<TypeRef> args = new ArrayList<TypeRef>();
-		for(t: $typeIds){
-			args.add(t.retval.t);
-		}
-		$t = args;
+		/*for(Tree typeIdTree: $typeIds){
+			args.add(typeIdTree.retval.t);
+		}*/
+		$tRefs = args;
 	} -> ^(GENERIC_ARGLIST typeId+);
 
 typeId	returns [TypeRef t]
 	: token='channel' '<' genericArgList '>' 
 	{
-		$t = new TypeRef($token, $genericArgList.t);
+		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 	} -> 'channel' genericArgList
 	| token='chanr' '<' genericArgList '>' 
 	{
-		$t = new TypeRef($token, $genericArgList.t);
+		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 	} -> 'chanr' genericArgList
 	| token='chanw' '<' genericArgList '>' 
 	{
-		$t = new TypeRef($token, $genericArgList.t);
+		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 	} -> 'chanw' genericArgList
 	| token=ID '<' genericArgList '>' 
 	{
-		$t = new TypeRef($token, $genericArgList.t);
+		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 	} -> GENERIC_TYPE ID genericArgList
 	| ID
@@ -329,12 +318,7 @@ paramStorageClass
 
 param 		: paramStorageClass typeId name=ID
 		{
-		DanType varType = types.get($typeId.text);
-		if(varType == null){
-			// TODO add a type lookahead
-			throw new TypeException($typeId.start, "type is not defined");
-		}
-		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, varType, $name));
+		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, $typeId.t, $name));
 		} -> ^(PARAM paramStorageClass typeId $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
@@ -380,19 +364,7 @@ storageClass	: 'static' | 'local' | 'mobile' | -> 'mobile';
 
 vardec_stmt 	: storageClass typeId name=ID varInit
 		{
-		DanType varType = types.get($typeId.text);
-		if(varType == null){
-			// TODO add a type lookahead
-			System.out.println(
-				"unknown type:"
-				+ $typeId.text
-				+ " at "
-				+ $typeId.start.getLine() + ":" + $typeId.start.getCharPositionInLine()
-				);
-			++errorCount;
-		} else {
-			$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, varType, $name));
-		}
+		$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, $typeId.t, $name));
 		} -> ^(VARDEC storageClass typeId $name varInit);
 		
 varInit		: ('=' exp) -> '=' exp
@@ -401,50 +373,17 @@ varInit		: ('=' exp) -> '=' exp
 
 send_stmt 	: ID '!' exp 
 		{
-		DanType endType = getSymbolType($ID.text);
-		if(endType == null){
-			System.out.println(
-				"target of '!' is not defined or is not in scope: "
-				+ $ID.text
-				+ " at "
-				+ $ID.line + ":" + $ID.pos);
-			++errorCount;
-		}
+		
 		} -> ^('!' ID exp);
 
 receive_stmt	: from=ID '?' target=ID 
 		{
-		DanType endType = getSymbolType($from.text);
-		if(endType == null){
-			System.out.println(
-				"source channel end of '?' is not defined or is not in scope: "
-				+ $from.text
-				+ " at "
-				+ $from.line + ":" + $from.pos);
-			++errorCount;
-		}
-		DanType targetType = getSymbolType($target.text);
-		if(targetType == null){
-			System.out.println(
-				"target of '?' is not defined or is not in scope: "
-				+ $target.text
-				+ " at "
-				+ $target.line + ":" + $target.pos);
-			++errorCount;
-		}
+		
 		} -> ^('?' $from $target);
 
 assign_stmt 	: ID '='^ exp
 		{
-		DanType targetType = getSymbolType($ID.text);
-		if(targetType == null){
-			System.out.println(
-				"target of assignment is not defined or is not in scope: "
-				+ $ID.text
-				+ " at "
-				+ $ID.line + ":" + $ID.pos);
-			++errorCount;
-		}
+		
 		};
 
 return_stmt	: 'return' exp -> ^('return' exp);
@@ -477,17 +416,6 @@ unary_prefix_op : 'not' | '+' | '-';
  	
 atom 		: literal 
 		| ID 
-		{
-		DanType varType = getSymbolType($ID.text);
-		if(varType == null){
-			System.out.println(
-				"variable is not defined or is not in scope: "
-								+ $ID.text
-				+ " at "
-				+ $ID.line + ":" + $ID.pos);
-			++errorCount;
-		}
-		}
 		| call 
 		| constructor
 		| '(' exp ')' -> exp;
