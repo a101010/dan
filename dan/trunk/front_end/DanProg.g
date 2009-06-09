@@ -27,6 +27,7 @@ tokens
 	PARAM;
 	PARAMLIST;
 	PROGRAM;
+	SIMPLE_TYPE;
 	VARDEC;
 	VARINIT;
 }
@@ -333,7 +334,7 @@ typeId	returns [TypeRef t]
 		$t = new TypeRef($ID);
 		addTypeRef($t);
 		$TypeIdScope::typeRefs.add($t);
-	};
+	} -> SIMPLE_TYPE ID;
 
 paramStorageClass 
 	:	'static' | 'mobile' | -> 'mobile';
