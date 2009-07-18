@@ -1,4 +1,4 @@
-// Copyright 2007, Alan Grover
+// Copyright 2009, Alan Grover
 
 // This .c file represents the expected output (more or less) of the dan compiler for commstime.dan
 
