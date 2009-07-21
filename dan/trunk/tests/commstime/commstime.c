@@ -10,12 +10,12 @@
 
 typedef struct BundleR_BInt_tag
 {
-    ChanR_int32 *c;
+    __ChanR32 *c;
 } BundleR_BInt;
 
 typedef struct BundleW_BInt_tag
 {
-    ChanW_int32 *c;
+    __ChanW32 *c;
 } BundleW_BInt;
 
 // backing store for BInt channel bundle
@@ -26,7 +26,7 @@ typedef struct Bundle_BInt_tag
     BundleW_BInt                *write;
     BundleR_BInt                readStore;
     BundleW_BInt                writeStore;
-    Channel_int32_0_blocking    c;
+    __c0bs32				    c;
 } Bundle_BInt;
 
 
@@ -34,7 +34,8 @@ typedef struct Bundle_BInt_tag
 // BInt_chans constructor
 Bundle_BInt * Bundle_BInt_ctor(Bundle_BInt * chans)
 {
-    Channel_int32_0_blocking_ctor( &(chans->c) );
+	// TODO generate meaningful channel end ID's
+    __c0bs32_ctor( &(chans->c), "chanRId", "chanWId" );
     chans->readStore.c = chans->c.ends.read;
     chans->c.ends.read = 0; // because it is a mobile type
     chans->writeStore.c = chans->c.ends.write;
@@ -78,14 +79,17 @@ void Delta_body(proc * p, scheduler * s)
     }
 	while(1)
 	{
-        ChanR_int32 *in_r;
-        ChanW_int32 *out1_w;
-        ChanW_int32 *out2_w;
-        
+        __ChanR32 *in_r;
+        __ChanW32 *out1_w;
+        __ChanW32 *out2_w;
+		Type type;
+
         saveState(p->state, Delta_S1);
         in_r = locals->in->c;
 
-		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
+		// TODO use the type parameter
+		
+		result = in_r->read( in_r->channel, &type, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -104,7 +108,8 @@ void Delta_body(proc * p, scheduler * s)
 		}
         
         out1_w = locals->out1->c;
-		result = out1_w->write( out1_w->channel, locals->value, (void**) &p->exception, p, s);
+		// TODO use type parameter
+		result = out1_w->write( out1_w->channel, 0, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -144,7 +149,8 @@ void Delta_body(proc * p, scheduler * s)
 		}
 		
         out2_w = locals->out2->c;
-		result = out2_w->write( out2_w->channel, locals->value, (void **) &p->exception, p, s);
+		// TODO use type parameter
+		result = out2_w->write( out2_w->channel, 0, locals->value, (void **) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -233,13 +239,15 @@ void Succ_body(proc * p, scheduler *s)
         restoreState(p->state);
 	while(1)
 	{
-        ChanR_int32 * in_r;
-        ChanW_int32 *out_w;
+        __ChanR32 * in_r;
+        __ChanW32 *out_w;
+		Type type;
 
         saveState(p->state, Succ_S1);
 		
 		in_r = locals->in->c;
-		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
+		// TODO use type parameter
+		result = in_r->read( in_r->channel, &type, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -261,7 +269,8 @@ void Succ_body(proc * p, scheduler *s)
         
 		
 		out_w = locals->out->c;
-		result = out_w->write( out_w->channel, locals->value, (void**) &p->exception, p, s);
+		// TODO use type parameter
+		result = out_w->write( out_w->channel, 0, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -347,12 +356,13 @@ void Prefix_body(proc * p, scheduler * s)
 	int result = 0;
     Prefix_proc *pp = (Prefix_proc*) p;
 	Prefix_locals * locals = &(pp->locals);
-    ChanW_int32 *out_w = locals->out->c;
+    __ChanW32 *out_w = locals->out->c;
     if(p->state != _PS_READY_TO_RUN_)
         restoreState(p->state);
 
     printf("Prefix init value: %d\n", locals->value); 
-	result = out_w->write( out_w->channel, locals->value, (void**) &p->exception, p, s);
+	// TODO use type parameter
+	result = out_w->write( out_w->channel, 0, locals->value, (void**) &p->exception, p, s);
 	switch(result)
 	{
 	case 0: // wrote value and synced
@@ -392,10 +402,12 @@ void Prefix_body(proc * p, scheduler * s)
 
 	while(1)
 	{
-        ChanR_int32 * in_r;
+        __ChanR32 * in_r;
+		Type type;
         saveState(p->state, Prefix_S2);
 		in_r = locals->in->c;
-		result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
+		// TODO use type parameter
+		result = in_r->read( in_r->channel, &type, &(locals->value), &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // read value
@@ -414,8 +426,9 @@ void Prefix_body(proc * p, scheduler * s)
             goto EXIT;
 		}
 		
-		//ChanW_int32 *out_w = locals->out->c;
-		result = out_w->write( out_w->channel, locals->value, (void**) &p->exception, p, s);
+		//__ChanW32 *out_w = locals->out->c;
+		// TODO use type parameter
+		result = out_w->write( out_w->channel, 0, locals->value, (void**) &p->exception, p, s);
 		switch(result)
 		{
 		case 0 : // wrote value
@@ -513,10 +526,12 @@ void Count_body(proc * p, scheduler * s)
 		time( &(locals->time1));
         while(locals->i < locals->step)
         {
-            ChanR_int32 * in_r;
+            __ChanR32 * in_r;
+			Type type;
 			saveState(p->state, Count_S1);
 			in_r = locals->in->c;
-		    result = in_r->read( in_r->channel, &(locals->value), &p->exception, p, s);
+			// TODO use type parameter
+		    result = in_r->read( in_r->channel, &type, &(locals->value), &p->exception, p, s);
 			switch(result)
 			{
 			case 0 : // read value
@@ -699,7 +714,7 @@ void Commstime_body(proc * p, scheduler * s)
 			p->exception = "Commstime: pDelta1 didn't exit cleanly, but didn't throw exception\n";
 		}
 	}
-	unlock(locals->pDelta.p.spinlock);
+	unlock(locals->pDelta1.p.spinlock);
 
 	if(exception > 0)
 	{

@@ -5,7 +5,7 @@
 	Name="Commstime"
 	ProjectGUID="{EBDE4268-3FC4-43C7-A042-D93F9D2D149E}"
 	Keyword="Win32Proj"
-	TargetFrameworkVersion="0"
+	TargetFrameworkVersion="196613"
 	>
 	<Platforms>
 		<Platform
@@ -61,6 +61,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="&quot;C:\Documents and Settings\Alan\My Documents\Alan\osource\dan\dan\trunk\runtime\sthread\Debug&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"
