@@ -13,7 +13,7 @@ struct __c0bs32Type_tag
     int initialized;
     __ChanEndType reader;
     __ChanEndType writer;
-} __c0bs32Type = {0};
+};
 
 void __c0bs32_OpPoison(__Channel32 *chan, scheduler *s);
 int __c0bs32_OpIsPoisoned(__Channel32 *chan);

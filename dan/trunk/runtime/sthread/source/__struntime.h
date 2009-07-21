@@ -1,6 +1,7 @@
 #ifndef __STRUNTIME_H_
 #define __STRUNTIME_H_
 
+#include "__spinlock.h"
 #include "__saveState.h"
 #include "__list.h"
 #include "__Type.h"
