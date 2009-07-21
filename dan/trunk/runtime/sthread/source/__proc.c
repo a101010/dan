@@ -1,5 +1,20 @@
 #include "__proc.h"
 
+char * proc_state_to_string(uint32 state)
+{
+    switch(state)
+    {
+    case _PS_EXCEPTION_:
+        return "EXCEPTION";
+    case _PS_CLEAN_EXIT_:
+        return "CLEAN_EXIT";
+    case _PS_READY_TO_RUN_:
+        return "READY_TO_RUN";
+    default:
+        return "RUNNING";
+    }
+}
+
 char * scheduler_state_to_string(scheduler_state state)
 {
 	if(state == _FREE_)

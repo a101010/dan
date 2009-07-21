@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "__c0bs32.h"
 
+struct __c0bs32Type_tag __c0bs32Type = {0};
 
 void __c0bs32Type_init()
 {
