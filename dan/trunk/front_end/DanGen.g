@@ -42,9 +42,16 @@ declaration	: ^(DECLARATION decChoice) -> template(dec={$decChoice.st}) "<dec>"
 								     dec={$decChoice.st});
     
 decChoice 	: procDec -> template(dec={$procDec.st}) "<dec>"
-		| bundleDec -> template(dec={"bundleDec"}) "<dec>"/*-> template(dec={$bundleDec.st}) "<dec>" */;
+		| bundleDec -> template(dec={$bundleDec.st}) "<dec>"/*-> template(dec={$bundleDec.st}) "<dec>" */;
 
-bundleDec 	: ^('bundle' ID bundle_body);	
+bundleDec 	: ^('bundle' ID bundle_body) -> simpleBundleDec(bundleType={$ID.text}, 
+								channelDeclarations={"<channelDeclarations>"}, 
+								channelConstructors={"<channelConstructors"},
+								readEnds={"<readEnds"},
+								writeEnds={"<writeEnds"});	
+//-> simpleBundleDec(bundleType={ID}, 
+//								channelDeclarations={bundle_body.cd}, 
+//								channelConstructors={bundle_body.cc});	
 
 bundle_body 	: ^(BUNDLE_CHANNELS channel_dec+);
 	
@@ -101,23 +108,23 @@ procDec 	scope
 		}-> procDec(
 			procType={$name},
 		        locals={"<locals>"},
-		        params={"<params>"},
+		        params={$paramList.st},
 		        args={"<args>"},
 		        initLocals={"<initLocals>"},
 		        procBodyScratchInit={$procDec::scratchInit},
 		        statements={"<block>"},
 		        cleanup={"<cleanup>"}) ;
 
-paramList 	: ^(PARAMLIST rameses+=param*) -> template(params={$rameses}) "<params>";
+paramList 	: ^(PARAMLIST rameses+=param*) -> paramList(params={$rameses});
 
 genericArgList
-	:	^(GENERIC_ARGLIST tIds+=typeId+) -> template(list={$tIds})"<list>";
+	:	^(GENERIC_ARGLIST tIds+=typeId+) -> genericArgList(args={$tIds});
 	
-typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> template(id={$ID}) "typeId type=<id>"
-		| 'channel' genericArgList { System.out.println("type is channel<>"); } -> template(typeId={"channel"}, ga={$genericArgList.st}) "typeId type=<id> genericArgList=<ga>"
-		| 'chanr' genericArgList { System.out.println("type is chanr<>"); } -> template(typeId={"chanr"}, ga={$genericArgList.st}) "typeId type=<id> genericArgList=<ga>" 
-		| 'chanw' genericArgList { System.out.println("type is chanw<>"); } -> template(typeId={"chanw"}, ga={$genericArgList.st}) "typeId type=<id> genericArgList=<ga>" 
-		| GENERIC_TYPE ID genericArgList {System.out.println("type is " + $ID + "<>"); } -> template(typeId={$ID}, ga={$genericArgList.st}) "typeId type=<id> genericArgList=<ga>"; 
+typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
+		| 'channel' genericArgList { System.out.println("type is channel<>"); } -> genericTypeId(id={"channel"}, ga={$genericArgList.st})
+		| 'chanr' genericArgList { System.out.println("type is chanr<>"); } -> genericTypeId(id={"chanr"}, ga={$genericArgList.st})
+		| 'chanw' genericArgList { System.out.println("type is chanw<>"); } -> genericTypeId(id={"chanw"}, ga={$genericArgList.st})
+		| GENERIC_TYPE ID genericArgList {System.out.println("type is " + $ID + "<>"); } -> genericTypeId(id={$ID}, ga={$genericArgList.st}); 
 		
 paramStorageClass
 	:	'static' | 'mobile';
@@ -134,7 +141,7 @@ param 		: ^(PARAM paramStorageClass typeId name=ID)
 					new STAttrMap().put("type", paramType.getEmittedType()).put("name", $name));
 			}
 			retval.st = paramTemplate;*/
-		} -> template(id={$typeId.st}, name={$name})"<id> <name>";
+		} -> param(type={$typeId.st}, name={$name});
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
 
