@@ -44,20 +44,70 @@ declaration	: ^(DECLARATION decChoice) -> template(dec={$decChoice.st}) "<dec>"
 decChoice 	: procDec -> template(dec={$procDec.st}) "<dec>"
 		| bundleDec -> template(dec={$bundleDec.st}) "<dec>"/*-> template(dec={$bundleDec.st}) "<dec>" */;
 
-bundleDec 	: ^('bundle' ID bundle_body) -> simpleBundleDec(bundleType={$ID.text}, 
-								channelDeclarations={"<channelDeclarations>"}, 
-								channelConstructors={"<channelConstructors"},
-								readEnds={"<readEnds"},
-								writeEnds={"<writeEnds"});	
-//-> simpleBundleDec(bundleType={ID}, 
-//								channelDeclarations={bundle_body.cd}, 
-//								channelConstructors={bundle_body.cc});	
+bundleDec 	scope
+		{
+			ArrayList<StringTemplate> channelDeclarations; 
+			ArrayList<StringTemplate> channelConstructors; 
+			ArrayList<StringTemplate> readEnds; 
+			ArrayList<StringTemplate> writeEnds; 
+		}
+		@init
+		{
+			$bundleDec::channelDeclarations = new ArrayList<StringTemplate>();
+			$bundleDec::channelConstructors = new ArrayList<StringTemplate>();
+			$bundleDec::readEnds = new ArrayList<StringTemplate>();
+			$bundleDec::writeEnds = new ArrayList<StringTemplate>();
+		}
+		: ^('bundle' ID bundle_body)
+		{
+			StringTemplate cd = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::channelDeclarations));
+			StringTemplate cc = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::channelConstructors));
+			StringTemplate re = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::readEnds));
+			StringTemplate we = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::writeEnds));
+			retval.st = templateLib.getInstanceOf("simpleBundleDec",
+							      new STAttrMap().put("bundleType", $ID.text)
+							                     .put("channelDeclarations", cd)
+							                     .put("channelConstructors", cc)
+							                     .put("readEnds", re)
+							                     .put("writeEnds", we));
+							      
+		};	
 
 bundle_body 	: ^(BUNDLE_CHANNELS channel_dec+);
 	
-channel_dec 	:  ^('channel' genericArgList name=ID channel_dir);
+channel_dec 	:  ^('channel' genericArgList name=ID channel_dir)
+		{
+			// TODO add a mapping to the channel type
+			$bundleDec::channelDeclarations.add(templateLib.getInstanceOf("localValueDec",
+					new STAttrMap().put("type", "__c0bs32").put("name", $name)));
+			$bundleDec::channelConstructors.add(templateLib.getInstanceOf("channelConstructorCall",
+					new STAttrMap().put("chanType", "__c0bs32").put("chanName", $name).put("readEndId", "\"readEndId\"").put("writeEndId", "\"writeEndId\"")));
+			if($channel_dir.forward)
+			{
+				// TODO add a mapping from channel types to channel end types
+				$bundleDec::readEnds.add(templateLib.getInstanceOf("localByRefDec",
+					new STAttrMap().put("type", "__ChanR32").put("name", $name)));
+				$bundleDec::writeEnds.add(templateLib.getInstanceOf("localByRefDec",
+					new STAttrMap().put("type", "__ChanW32").put("name", $name)));
+			}
+			else
+			{
+				$bundleDec::readEnds.add(templateLib.getInstanceOf("localByRefDec",
+					new STAttrMap().put("type", "__ChanW32").put("name", $name)));
+				$bundleDec::writeEnds.add(templateLib.getInstanceOf("localByRefDec",
+					new STAttrMap().put("type", "__ChanR32").put("name", $name)));
+			}
+		};
 	
-channel_dir 	: '->' | '<-';
+channel_dir 	returns [boolean forward]
+		: '->' 
+		{
+			$forward = true;
+		}
+		| '<-'
+		{
+			$forward = false;
+		};
 
 attrib 		: ID -> attrib(attribId={$ID.text});
 

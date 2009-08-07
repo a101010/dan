@@ -87,7 +87,10 @@ Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans)
 
 >>
 
+channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
+<chanType>_ctor( &(chans-><chanName>), <readEndId>, <writeEndId>);
 
+>>
 
 procDec(procType,
         locals,
@@ -336,4 +339,9 @@ genericArgList(args) ::= <<
 
 paramList(params) ::= <<
 <params>
+>>
+
+statementList(statements) ::= <<
+<statements; separator="\n">
+
 >>
