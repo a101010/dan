@@ -20,12 +20,14 @@ public class Vardec {
 
     public final TypeRef Type;
     public final Token Name;
+    public final String EmittedName;
     public final StgClass StorageClass;
     
     
-    public Vardec(StgClass storageClass, TypeRef type, Token name){
+    public Vardec(StgClass storageClass, TypeRef type, Token name, String emittedName){
         StorageClass = storageClass;
         Type = type;
         Name = name;
+        EmittedName = emittedName;
     }
 }
