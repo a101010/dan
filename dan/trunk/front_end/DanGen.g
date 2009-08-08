@@ -157,7 +157,7 @@ procDec 	scope
                         }
 		}-> procDec(
 			procType={$name},
-		        locals={"<locals>"},
+		        locals={$procDec::locals},
 		        params={$paramList.st},
 		        args={"<args>"},
 		        initLocals={"<initLocals>"},
@@ -217,7 +217,26 @@ succ_stmt	: ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
-vardec_stmt 	: ^(VARDEC storageClass typeId name=ID varInit);
+vardec_stmt 	: ^(VARDEC storageClass typeId name=ID varInit)
+		{
+			StringTemplate vardecTemplate;
+			// TODO use geterated type map to get the final type
+			// TODO use storageClass to modify isByRef when static
+			DanType resolvedType = new BuiltinType(BuiltinType.Builtins.Int32);
+			if(resolvedType.isByRef())
+			{
+				vardecTemplate = templateLib.getInstanceOf("localByRefDec",
+									   new STAttrMap().put("type", resolvedType.getEmittedType())
+									                  .put("name", $name));
+			}
+			else
+			{
+				vardecTemplate = templateLib.getInstanceOf("localValueDec",
+									   new STAttrMap().put("type", resolvedType.getEmittedType())
+									                  .put("name", $name));
+			}
+			$procDec::locals.add(vardecTemplate);
+		};
 
 varInit		: '=' exp | NO_INIT;
 

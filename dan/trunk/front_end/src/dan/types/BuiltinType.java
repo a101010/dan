@@ -14,6 +14,7 @@ public class BuiltinType extends DanType {
         Void,
         Bool,
         Int32,
+        Uint32,
         Float32
     }
     /* 

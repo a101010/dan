@@ -7,6 +7,7 @@
 package dan.types;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import org.antlr.runtime.Token;
 
 // The user-definable parts of a proc type are
@@ -29,13 +30,22 @@ public class ProcType extends DanType {
         if(t.getText().contains("."))
             throw new TypeException(t, "Proc type names may not contain '.'");
     }
-    public ArrayList<Vardec> Params;
-    public TypeRef ReturnType;
+    public final ArrayList<Vardec> Params;
+    public final TypeRef ReturnType;
+    public final HashMap<String, Vardec> Locals; // the key is the emitted name
+    public final Scope RootScope;
     //public ArrayList<CallNode> callChains;  // no call chains in commstime3 example
     
-    public ProcType(Token name, TypeRef returnType){
+    public ProcType(Token name, 
+                    TypeRef returnType,
+                    ArrayList<Vardec> params,
+                    HashMap<String, Vardec> locals,
+                    Scope rootScope){
         super(name);
         ValidateName(name);
         ReturnType = returnType;
+        RootScope = rootScope;
+        Locals = locals;
+        Params = params;
     }
 }

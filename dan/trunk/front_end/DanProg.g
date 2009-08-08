@@ -51,63 +51,19 @@ import dan.system.*;
 
 @members 
 {
-public HashMap<String, DanType> types = new HashMap<String, DanType>();
-public HashMap<String, ArrayList<TypeRef>> typeRefs = new HashMap<String, ArrayList<TypeRef>>();
-
-public int errorCount = 0;
-
-void addTypeRef(TypeRef t){
-	ArrayList<TypeRef> refs = typeRefs.get(t.toString());
-	if(refs == null){
-		refs = new ArrayList<TypeRef>();
-		typeRefs.put(t.toString(), refs);
-	}
-	refs.add(t);
-}
-
-/* TODO these may belong on DanType; however needs to be updated to use TypeRef and can't use it on the first pass
-DanType getSymbolType(String id){
-	String[] splitId = id.split("\\.");
-	DanType t = searchForSymbolInBlock(splitId);
-	if(t != null)
-		return t;
-	t = searchForSymbolInParamList(splitId);
-	if(t != null)
-		return t;
-//	t = searchForSymbolInStaticMembers(splitId);
-	return t;
-}
-
-// TODO quite a bit of common code here; find a way to simplify
-DanType searchForSymbolInBlock(String[] splitId){
-	for(int i = $block.size() - 1; i >= 0; --i){
-		for(Vardec v : $block[i]::symbols.values()){
-			if(v.Name.getText().equals(splitId[0])){
-				if(splitId.length == 1)
-					return v.Type;
-				return v.Type.getMemberType(ArrayUtils.tail(splitId));
-			}
-		}
-	}
-	return null;
-}
-
-DanType searchForSymbolInParamList(String[] splitId){
-	for(Vardec v : $procDec::paramList){
-		if(v.Name.getText().equals(splitId[0])){
-			if(splitId.length == 1)
-					return v.Type;
-			return v.Type.getMemberType(ArrayUtils.tail(splitId));
-		}
-	}
-	return null;
-}
-
-DanType searchForSymbolInStaticMembers(String id){
-	throw new NotImplementedException();
-}
-*/
+	public HashMap<String, DanType> types = new HashMap<String, DanType>();
+	public HashMap<String, ArrayList<TypeRef>> typeRefs = new HashMap<String, ArrayList<TypeRef>>();
 	
+	public int errorCount = 0;
+	
+	void addTypeRef(TypeRef t){
+		ArrayList<TypeRef> refs = typeRefs.get(t.toString());
+		if(refs == null){
+			refs = new ArrayList<TypeRef>();
+			typeRefs.put(t.toString(), refs);
+		}
+		refs.add(t);
+	}	
 }
 
 
@@ -271,23 +227,25 @@ attribAdorn 	: attrib+ -> ^(ADORNMENTS attrib+);
 
 procDec 	scope
 		{
-		ArrayList<Vardec> paramList;
+			ArrayList<Vardec> params;
+			Scope currentScope;
+			HashMap<String, Vardec> locals; // key is emitted name
 		}
 		@init
 		{
-		$procDec::paramList = new ArrayList<Vardec>();
+			$procDec::params = new ArrayList<Vardec>();
+			$procDec::currentScope = null; // will be assigned the root scope in the first block rule
+			$procDec::locals = new HashMap<String, Vardec>();
 		}
-		: 'proc' typeId name=ID '(' paramList ')' block // TODO add a generic paramlist
+		: 'proc' typeId pname=ID '(' paramList ')' block // TODO add a generic paramlist
 		{
-		if(types.containsKey($name)){
-			System.out.println("proc type " + $name.text +  " is already defined: " + $name.line + ":" + $name.pos);
-			++errorCount;
-		} else {
-			// TODO add the parameters
-			ProcType procType = new ProcType($name, $typeId.t);
-			procType.Params = $procDec::paramList;	
-			types.put(procType.getName(), procType);	
-		}
+			if(types.containsKey($pname)){
+				System.out.println("proc type " + $pname.text +  " is already defined: " + $pname.line + ":" + $pname.pos);
+				++errorCount;
+			} else {
+				ProcType procType = new ProcType($pname, $typeId.t, $procDec::params, $procDec::locals, $procDec::currentScope);
+				types.put(procType.getName(), procType);	
+			}
 		} -> ^('proc' ID ID paramList block);
 
 paramList 	: param  (',' param)* -> ^(PARAMLIST param+)
@@ -341,7 +299,7 @@ paramStorageClass
 
 param 		: paramStorageClass typeId name=ID
 		{
-		$procDec::paramList.add(new Vardec(Vardec.StgClass.Static, $typeId.t, $name));
+			$procDec::params.add(new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text));
 		} -> ^(PARAM paramStorageClass typeId $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
@@ -354,20 +312,26 @@ simple_statement
 		| return_stmt STMT_END -> return_stmt
 		| call STMT_END -> call;
 
-block 		scope
-		{
-		HashMap<String, Vardec> symbols;
-		}
+block 		
 		@init
 		{
-		$block::symbols = new HashMap<String, Vardec>();
+			
+			$procDec::currentScope = new Scope($procDec::currentScope);
+			if($procDec::currentScope.Parent != null){
+				$procDec::currentScope.Parent.Children.add($procDec::currentScope);
+			}
 		}
 		: BLOCK_BEGIN statement+ BLOCK_END 
 		{
-		System.out.println("Symbols in the current block:");
-		for(Vardec v : $block::symbols.values()){
-			System.out.println("\t" + v.Type.getName() + " " + v.Name.getText() + "\n");
-		}
+			System.out.println("Symbols in the current block:");
+			for(Vardec v : $procDec::currentScope.Symbols.values()){
+				System.out.println("\t" + v.Type.getName() + " " + v.Name.getText() + "\n");
+			}
+			
+			// pop the current scope unless it is the root scope
+			if($procDec::currentScope.Parent != null){
+				$procDec::currentScope = $procDec::currentScope.Parent;
+			}
 		} -> ^(BLOCK statement+);
 
 while_stmt 	: 'while' '(' exp ')' statement
@@ -387,7 +351,8 @@ storageClass	: 'static' | 'local' | 'mobile' | -> 'mobile';
 
 vardec_stmt 	: storageClass typeId name=ID varInit
 		{
-		$block::symbols.put($name.text, new Vardec(Vardec.StgClass.Static, $typeId.t, $name));
+			// TODO created emitted name if there is a conflict in procDec::locals
+			$procDec::currentScope.Symbols.put($name.text, new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text));
 		} -> ^(VARDEC storageClass typeId $name varInit);
 		
 varInit		: ('=' exp) -> '=' exp
