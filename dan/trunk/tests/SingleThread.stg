@@ -95,7 +95,6 @@ channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
 procDec(procType,
         locals,
         params,
-        args,
         initLocals,
         procBodyScratchInit,
         statements,
