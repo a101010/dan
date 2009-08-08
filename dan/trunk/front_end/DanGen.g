@@ -79,23 +79,31 @@ channel_dec 	:  ^('channel' genericArgList name=ID channel_dir)
 		{
 			// TODO add a mapping to the channel type
 			$bundleDec::channelDeclarations.add(templateLib.getInstanceOf("localValueDec",
-					new STAttrMap().put("type", "__c0bs32").put("name", $name)));
+					new STAttrMap().put("type", "__c0bs32")
+					               .put("name", $name)));
 			$bundleDec::channelConstructors.add(templateLib.getInstanceOf("channelConstructorCall",
-					new STAttrMap().put("chanType", "__c0bs32").put("chanName", $name).put("readEndId", "\"readEndId\"").put("writeEndId", "\"writeEndId\"")));
+					new STAttrMap().put("chanType", "__c0bs32")
+					               .put("chanName", $name)
+					               .put("readEndId", "\"readEndId\"")
+					               .put("writeEndId", "\"writeEndId\"")));
 			if($channel_dir.forward)
 			{
 				// TODO add a mapping from channel types to channel end types
 				$bundleDec::readEnds.add(templateLib.getInstanceOf("localByRefDec",
-					new STAttrMap().put("type", "__ChanR32").put("name", $name)));
+					new STAttrMap().put("type", "__ChanR32")
+					               .put("name", $name)));
 				$bundleDec::writeEnds.add(templateLib.getInstanceOf("localByRefDec",
-					new STAttrMap().put("type", "__ChanW32").put("name", $name)));
+					new STAttrMap().put("type", "__ChanW32")
+					               .put("name", $name)));
 			}
 			else
 			{
 				$bundleDec::readEnds.add(templateLib.getInstanceOf("localByRefDec",
-					new STAttrMap().put("type", "__ChanW32").put("name", $name)));
+					new STAttrMap().put("type", "__ChanW32")
+					               .put("name", $name)));
 				$bundleDec::writeEnds.add(templateLib.getInstanceOf("localByRefDec",
-					new STAttrMap().put("type", "__ChanR32").put("name", $name)));
+					new STAttrMap().put("type", "__ChanR32")
+					               .put("name", $name)));
 			}
 		};
 	
@@ -159,7 +167,6 @@ procDec 	scope
 			procType={$name},
 		        locals={$procDec::locals},
 		        params={$paramList.st},
-		        args={"<args>"},
 		        initLocals={"<initLocals>"},
 		        procBodyScratchInit={$procDec::scratchInit},
 		        statements={"<block>"},
