@@ -70,5 +70,10 @@ public class BundleType extends DanType {
         
         return getRightmostType(splitId, member);
     }
+
+    @Override
+    public String getEmittedType(){
+        return "Bundle_" + getName();
+    }
     
 }

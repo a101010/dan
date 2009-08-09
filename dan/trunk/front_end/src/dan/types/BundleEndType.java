@@ -19,6 +19,7 @@ public class BundleEndType extends DanType {
     public BundleEndType(Token t, Directions d){
         super(t);
         Direction = d;
+        emittedType = null;
     }
     
     public final Directions Direction;
@@ -30,7 +31,8 @@ public class BundleEndType extends DanType {
     
     // TODO perhaps these need to be validated; they should be restricted
     // to channel reader and writer types
-    public ArrayList<Vardec> ChanEnds; 
+    public ArrayList<Vardec> ChanEnds;
+    private String emittedType;
     
     @Override
     public DanType getMemberType(String[] splitId){
@@ -47,7 +49,15 @@ public class BundleEndType extends DanType {
 
     @Override
     public String getEmittedType(){
-        return "bundle_end";
+        if(emittedType == null){
+            if(Direction == Directions.Read) {
+                emittedType = "BundleR_" + token.getText();
+            }
+            else {
+                emittedType = "BundleW_" + token.getText();
+            }
+        }
+        return emittedType;
     }
 
     @Override
