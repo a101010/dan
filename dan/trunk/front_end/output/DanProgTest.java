@@ -37,6 +37,8 @@ public class DanProgTest {
             parser.types.put(b.name(), bType);
             parser.types.put(b.name().toLowerCase(), bType);
         }
+        // TODO Initialize the channel types
+
 
         // Parse input and build AST
         DanProgParser.prog_return result = parser.prog();
@@ -57,6 +59,23 @@ public class DanProgTest {
         System.out.println(types + "\n");
         
         System.out.println("Number of errors: " + parser.errorCount);
+
+        // resolve types
+
+        DanType type;
+        for(String typeName: parser.typeRefs.keySet()){
+            ArrayList<TypeRef> tRefs = parser.typeRefs.get(typeName);
+            type = parser.types.get(typeName);
+            // TODO it might be a channel type or other generic type
+            // TODO add handling for other generic types (and a recursive helper function or two)
+            if(type == null){
+                // TODO add better error handling, including the token's location
+                throw new Exception("type " + typeName + " not found" );
+            }
+            for(TypeRef tRef: tRefs){
+                tRef.setResolvedType(type);
+            }
+        }
 
         // load the template group file
         FileReader groupFileR = new FileReader("SingleThread.stg");

@@ -48,4 +48,9 @@ public class ProcType extends DanType {
         Locals = locals;
         Params = params;
     }
+
+    @Override
+    public String getEmittedType(){
+        return getName() + "_proc";
+    }
 }

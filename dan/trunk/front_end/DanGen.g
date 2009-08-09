@@ -123,23 +123,18 @@ attribAdorn 	: ^(ADORNMENTS (a+=attrib)+) -> template(attribs={$a}) "<attribs>";
 
 procDec 	scope
 		{
+			ProcType type;
 			ArrayList<StringTemplate> locals;
 			ArrayList<StringTemplate> params;
-			ArrayList<StringTemplate> args;
 			ArrayList<StringTemplate> initLocals;
 			ArrayList<StringTemplate> cleanup;
 			ArrayList<StringTemplate> scratchInit;
 			boolean hasIo;
 			boolean hasPar;
-			
-			
 		}
 		@init
 		{
-			$procDec::locals = new ArrayList<StringTemplate>();
-			$procDec::params = new ArrayList<StringTemplate>();
-			$procDec::args = new ArrayList<StringTemplate>();
-			$procDec::initLocals = new ArrayList<StringTemplate>();
+			$procDec::type = null;
 			// TODO at the moment cleanup is only at the end of a proc
 			// and always occurs
 			// Need to allow ref types that are passed as messages or 
@@ -151,33 +146,54 @@ procDec 	scope
 			$procDec::hasIo = false;
 			$procDec::hasPar = false;
 		}
-		: ^('proc' returnType=ID name=ID paramList block) 
+		: ^('proc' returnType=ID name=ID { $procDec::type = (ProcType) types.get($name.text); } paramList block) 
 		{
+			ProcType type = $procDec::type;
+			ArrayList<StringTemplate> scratchInit = new ArrayList<StringTemplate>(3);
+			
 			if($procDec::hasIo){
-				$procDec::scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
+				scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
 	                        	new STAttrMap().put("scratchInit", "int result = 0; // for the result of read and write ops\n")));
                         }
                         if($procDec::hasPar){
-				$procDec::scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
+				scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
 	                        	new STAttrMap().put("scratchInit", "int finished = 0; // for the number of procs in a par that have finished\n")));
-	                        $procDec::scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
+	                        scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
 	                        	new STAttrMap().put("scratchInit", "int exceptions = 0; // for the number of procs in a par that threw exceptions\n")));                        	
                         }
-		}-> procDec(
-			procType={$name},
-		        locals={$procDec::locals},
-		        params={$paramList.st},
-		        initLocals={"<initLocals>"},
-		        procBodyScratchInit={$procDec::scratchInit},
-		        statements={"<block>"},
-		        cleanup={"<cleanup>"}) ;
+                        ArrayList<StringTemplate> locals = new ArrayList<StringTemplate>(type.Locals.size());
+                        
+                        for(Vardec v: type.Locals.values()){
+                        	if(v.isByRef()){
+                        		locals.add( templateLib.getInstanceOf("localByRefDec",
+									      new STAttrMap().put("type", v.getEmittedType())
+									                     .put("name", v.EmittedName)));
+                        	}
+                        	else {
+                        		locals.add( templateLib.getInstanceOf("localValueDec",
+								              new STAttrMap().put("type", v.getEmittedType())
+										             .put("name", v.EmittedName)));
+                        	}
+                        }
+                        
+                        
+                        retval.st = templateLib.getInstanceOf("procDec",
+					new STAttrMap().put("procType", $name)
+					               .put("locals", locals)
+					               .put("params", $paramList.st)
+					               .put("initLocals", "<initLocals>")
+					               .put("procBodyScratchInit", scratchInit)
+					               .put("statements", "<block>")
+					               .put("cleanup", "<cleanup>")
+					               );
+		};
 
 paramList 	: ^(PARAMLIST rameses+=param*) -> paramList(params={$rameses});
 
 genericArgList
 	:	^(GENERIC_ARGLIST tIds+=typeId+) -> genericArgList(args={$tIds});
 	
-typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
+	typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
 		| 'channel' genericArgList { System.out.println("type is channel<>"); } -> genericTypeId(id={"channel"}, ga={$genericArgList.st})
 		| 'chanr' genericArgList { System.out.println("type is chanr<>"); } -> genericTypeId(id={"chanr"}, ga={$genericArgList.st})
 		| 'chanw' genericArgList { System.out.println("type is chanw<>"); } -> genericTypeId(id={"chanw"}, ga={$genericArgList.st})
@@ -224,26 +240,7 @@ succ_stmt	: ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
-vardec_stmt 	: ^(VARDEC storageClass typeId name=ID varInit)
-		{
-			StringTemplate vardecTemplate;
-			// TODO use geterated type map to get the final type
-			// TODO use storageClass to modify isByRef when static
-			DanType resolvedType = new BuiltinType(BuiltinType.Builtins.Int32);
-			if(resolvedType.isByRef())
-			{
-				vardecTemplate = templateLib.getInstanceOf("localByRefDec",
-									   new STAttrMap().put("type", resolvedType.getEmittedType())
-									                  .put("name", $name));
-			}
-			else
-			{
-				vardecTemplate = templateLib.getInstanceOf("localValueDec",
-									   new STAttrMap().put("type", resolvedType.getEmittedType())
-									                  .put("name", $name));
-			}
-			$procDec::locals.add(vardecTemplate);
-		};
+vardec_stmt 	: ^(VARDEC storageClass typeId name=ID varInit);
 
 varInit		: '=' exp | NO_INIT;
 

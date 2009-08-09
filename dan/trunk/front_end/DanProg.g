@@ -242,7 +242,8 @@ procDec 	scope
 			if(types.containsKey($pname)){
 				System.out.println("proc type " + $pname.text +  " is already defined: " + $pname.line + ":" + $pname.pos);
 				++errorCount;
-			} else {
+			} 
+			else {
 				ProcType procType = new ProcType($pname, $typeId.t, $procDec::params, $procDec::locals, $procDec::currentScope);
 				types.put(procType.getName(), procType);	
 			}
@@ -299,7 +300,9 @@ paramStorageClass
 
 param 		: paramStorageClass typeId name=ID
 		{
-			$procDec::params.add(new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text));
+			Vardec v = new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text, true);
+			$procDec::params.add(v);
+			$procDec::locals.put(v.EmittedName, v);
 		} -> ^(PARAM paramStorageClass typeId $name);
 
 statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
@@ -322,12 +325,7 @@ block
 			}
 		}
 		: BLOCK_BEGIN statement+ BLOCK_END 
-		{
-			System.out.println("Symbols in the current block:");
-			for(Vardec v : $procDec::currentScope.Symbols.values()){
-				System.out.println("\t" + v.Type.getName() + " " + v.Name.getText() + "\n");
-			}
-			
+		{		
 			// pop the current scope unless it is the root scope
 			if($procDec::currentScope.Parent != null){
 				$procDec::currentScope = $procDec::currentScope.Parent;
@@ -352,7 +350,9 @@ storageClass	: 'static' | 'local' | 'mobile' | -> 'mobile';
 vardec_stmt 	: storageClass typeId name=ID varInit
 		{
 			// TODO created emitted name if there is a conflict in procDec::locals
-			$procDec::currentScope.Symbols.put($name.text, new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text));
+			Vardec v = new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text, false);
+			$procDec::currentScope.Symbols.put($name.text, v);
+			$procDec::locals.put(v.EmittedName, v);
 		} -> ^(VARDEC storageClass typeId $name varInit);
 		
 varInit		: ('=' exp) -> '=' exp
@@ -446,18 +446,20 @@ constructor	: 'new' '(' pool ')' typeId '(' arg_list ')'
 
 call 		: ID '(' arg_list ')' 
 		{
-		// ID is either a proc type or a method call on a custom type
-		// TODO right now we just search proc types; add method calls
-		// (Can use getSymbolType)
-		ProcType procType = null;
-		procType = (ProcType) types.get($ID.text);
-		if(procType == null){
-			System.out.println("proc type undefined: " 
-				+ $ID.text
-				+ " at "
-				+ $ID.line + ":" + $ID.pos);
-			++errorCount;
-		}
+			// ID is either a proc type or a method call on a custom type
+			// TODO right now we just search types; add method calls
+			TypeRef tRef = new TypeRef($ID);
+			// need to allocate storage for the call (only recursive procs are dynamically allocated, so this allocates in the caller's context)
+			// TODO need unique names if calling the same proc more than once in a par
+			String emittedName = "__p" + $ID.text;
+			// we use the ID as the token here so we can report error information if the proc type isn't found; 
+			// not because it is really the name of the vardec
+			Vardec v = new Vardec(Vardec.StgClass.Static, tRef, $ID, emittedName, false);
+			$procDec::currentScope.Symbols.put(v.EmittedName, v);
+			$procDec::locals.put(v.EmittedName, v);
+			addTypeRef(tRef);
+			$TypeIdScope::typeRefs.add(tRef);
+		
 		} -> ^(CALL ID arg_list);
 
 arg_list 	: exp  (',' exp)* -> ^(ARGLIST exp+)
