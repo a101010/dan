@@ -58,7 +58,7 @@ bundleDec 	scope
 			$bundleDec::readEnds = new ArrayList<StringTemplate>();
 			$bundleDec::writeEnds = new ArrayList<StringTemplate>();
 		}
-		: ^('bundle' ID bundle_body)
+		: ^('bundle' ID bundleBody)
 		{
 			StringTemplate cd = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::channelDeclarations));
 			StringTemplate cc = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::channelConstructors));
@@ -73,41 +73,59 @@ bundleDec 	scope
 							      
 		};	
 
-bundle_body 	: ^(BUNDLE_CHANNELS channel_dec+);
-	
-channel_dec 	:  ^('channel' genericArgList name=ID channel_dir)
+bundleBody 	: ^(BUNDLE_STATEMENTS bundleStmt+);
+
+channelDepth	: 'unbounded' | INT_LIT | ID;
+
+channelBehavior : 'block' | 'overflow' | 'overwrite' | 'priority';
+
+channelArgs	: ^(CHAN_ARGS channelBehavior channelDepth)
+		| ^(CHAN_ARGS CHAN_NOBUFFER 'block');
+
+bundleStmt	: ^(BUNDLE_STATEMENT channelDecStmt1 channelDir)
 		{
+			String name = $channelDecStmt1.name;
 			// TODO add a mapping to the channel type
 			$bundleDec::channelDeclarations.add(templateLib.getInstanceOf("localValueDec",
 					new STAttrMap().put("type", "__c0bs32")
-					               .put("name", $name)));
+					               .put("name", name)));
 			$bundleDec::channelConstructors.add(templateLib.getInstanceOf("channelConstructorCall",
 					new STAttrMap().put("chanType", "__c0bs32")
-					               .put("chanName", $name)
+					               .put("chanName", name)
 					               .put("readEndId", "\"readEndId\"")
 					               .put("writeEndId", "\"writeEndId\"")));
-			if($channel_dir.forward)
+			if($channelDir.forward)
 			{
 				// TODO add a mapping from channel types to channel end types
 				$bundleDec::readEnds.add(templateLib.getInstanceOf("localByRefDec",
 					new STAttrMap().put("type", "__ChanR32")
-					               .put("name", $name)));
+					               .put("name", name)));
 				$bundleDec::writeEnds.add(templateLib.getInstanceOf("localByRefDec",
 					new STAttrMap().put("type", "__ChanW32")
-					               .put("name", $name)));
+					               .put("name", name)));
 			}
 			else
 			{
 				$bundleDec::readEnds.add(templateLib.getInstanceOf("localByRefDec",
 					new STAttrMap().put("type", "__ChanW32")
-					               .put("name", $name)));
+					               .put("name", name)));
 				$bundleDec::writeEnds.add(templateLib.getInstanceOf("localByRefDec",
 					new STAttrMap().put("type", "__ChanR32")
-					               .put("name", $name)));
+					               .put("name", name)));
 			}
 		};
 	
-channel_dir 	returns [boolean forward]
+channelDecStmt1	returns [String name]
+		:  ^(CHAN_VARDEC_1 chanTypeId channelArgs ID)
+		{
+			$name = $ID.text;
+		};
+		
+channelDecStmt2 
+	:	 ^(CHAN_VARDEC_2 paramStorageClass chanTypeId channelArgs ID);
+		
+	
+channelDir 	returns [boolean forward]
 		: '->' 
 		{
 			$forward = true;
@@ -190,11 +208,11 @@ procDec 	scope
 
 paramList 	: ^(PARAMLIST rameses+=param*) -> paramList(params={$rameses});
 
-genericArgList
-	:	^(GENERIC_ARGLIST tIds+=typeId+) -> genericArgList(args={$tIds});
+genericArgList	: ^(GENERIC_ARGLIST tIds+=typeId+) -> genericArgList(args={$tIds});
 	
-	typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
-		| 'channel' genericArgList { System.out.println("type is channel<>"); } -> genericTypeId(id={"channel"}, ga={$genericArgList.st})
+chanTypeId  	: 'channel' genericArgList { System.out.println("type is channel<>"); } -> genericTypeId(id={"channel"}, ga={$genericArgList.st});
+
+typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
 		| 'chanr' genericArgList { System.out.println("type is chanr<>"); } -> genericTypeId(id={"chanr"}, ga={$genericArgList.st})
 		| 'chanw' genericArgList { System.out.println("type is chanw<>"); } -> genericTypeId(id={"chanw"}, ga={$genericArgList.st})
 		| GENERIC_TYPE ID genericArgList {System.out.println("type is " + $ID + "<>"); } -> genericTypeId(id={$ID}, ga={$genericArgList.st}); 
@@ -216,41 +234,41 @@ param 		: ^(PARAM paramStorageClass typeId name=ID)
 			retval.st = paramTemplate;*/
 		} -> param(type={$typeId.st}, name={$name});
 
-statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
+statement 	: (whileStmt | ifStmt | cifStmt | parStmt | succStmt | block | simpleStatement);
 
-simple_statement 
-		: vardec_stmt
-			| send_stmt
-			| receive_stmt
-			| assign_stmt
-			| return_stmt
+simpleStatement 
+		: varDecStmt
+			| sendStmt
+			| receiveStmt
+			| assignStmt
+			| returnStmt
 			| call;
 
 block 		: ^(BLOCK statement+) -> template(statements={"<statements>"}) "<statements>";
 
-while_stmt 	: ^('while' exp statement);
+whileStmt 	: ^('while' exp statement);
 
-if_stmt		: ^('if' exp statement);
+ifStmt		: ^('if' exp statement);
 
-cif_stmt 	: ^('cif' ID statement);
+cifStmt 	: ^('cif' ID statement);
 
-par_stmt	: ^('par' block) { $procDec::hasPar = true;} ;
+parStmt		: ^('par' block) { $procDec::hasPar = true;} ;
 
-succ_stmt	: ^('succ' block);
+succStmt	: ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
-vardec_stmt 	: ^(VARDEC storageClass typeId name=ID varInit);
+varDecStmt 	: ^(VARDEC storageClass typeId name=ID varInit);
 
 varInit		: '=' exp | NO_INIT;
 
-send_stmt 	: ^('!' ID exp) { $procDec::hasIo = true; };
+sendStmt 	: ^('!' ID exp) { $procDec::hasIo = true; };
 
-receive_stmt	: ^('?' from=ID target=ID) { $procDec::hasIo = true; };
+receiveStmt	: ^('?' from=ID target=ID) { $procDec::hasIo = true; };
 
-assign_stmt 	: ^('=' ID exp);
+assignStmt 	: ^('=' ID exp);
 
-return_stmt	: ^('return' exp);
+returnStmt	: ^('return' exp);
 
 exp	 	: literal
 		| ID
@@ -275,11 +293,11 @@ exp	 	: literal
 
 pool		: 'static' | 'local' | ID;
 
-constructor	: ^(CONSTRUCTOR pool typeId arg_list);
+constructor	: ^(CONSTRUCTOR pool typeId argList);
 		
-call		: ^(CALL ID arg_list);
+call		: ^(CALL ID argList);
 
-arg_list 	: ^(ARGLIST exp+)
+argList 	: ^(ARGLIST exp+)
 		| ^(ARGLIST NO_ARG);
 
 literal 	: 'true' | 'false' | FLOAT_LIT | INT_LIT;

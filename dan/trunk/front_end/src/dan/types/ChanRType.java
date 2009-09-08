@@ -17,8 +17,13 @@ public class ChanRType extends DanType {
     protected String emittedTypeRep;
 
     /**
+     * A reference to a channel type.
      *
-     * @param p The channel protocol
+     * Type references are resolved after the first compiler pass.
+     * The channel parameters are assigned when the channel is "constructed".
+     * Contruction completes the type reference (i.e. has compile time info
+     * necessary to select the correct channel type) as well as indicating
+     * run-time construction.
      */
     public ChanRType(ArrayList<TypeRef> p){
         super(new CommonToken(ChanrTokenId, "'chanr'"));
@@ -52,4 +57,6 @@ public class ChanRType extends DanType {
         }
         return emittedTypeRep;
     }
+
+
 }

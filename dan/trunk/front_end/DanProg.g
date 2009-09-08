@@ -10,12 +10,15 @@ tokens
 	ARGLIST;
 	BLOCK;
 	BUNDLE_TYPEDEF;
-	BUNDLE_CHANNELS;
+	BUNDLE_STATEMENTS;
+	BUNDLE_STATEMENT;
 	BUNDLE_PROTOCOL;
 	CALL;
 	CHAN_DEF;
-	CHAN_PARAMS;
+	CHAN_ARGS;
 	CHAN_NOBUFFER;
+	CHAN_VARDEC_1;
+	CHAN_VARDEC_2;
 	CONSTRUCTOR;
 	DECLARATION;
 	EXP;
@@ -104,7 +107,7 @@ bundleDec
 	$bundleDec::writerEnds = new ArrayList<Vardec>();
 	$bundleDec::readerEnds = new ArrayList<Vardec>();
 	}
-	: 'bundle' ID bundle_body 
+	: 'bundle' ID bundleBody 
 	
 	{
 	BundleType.ValidateName($ID);
@@ -122,19 +125,19 @@ bundleDec
 		writerEnd.ChanEnds = $bundleDec::writerEnds;
 		readerEnd.ChanEnds = $bundleDec::readerEnds;
 	}
-	} -> ^('bundle' ID bundle_body);
+	} -> ^('bundle' ID bundleBody);
 
-bundle_body 	: '{' channelDec+ '}' -> ^(BUNDLE_CHANNELS channelDec+);
+bundleBody 	: '{' bundleStmt+ '}' -> ^(BUNDLE_STATEMENTS bundleStmt+);
 
 // an ID is only valid as a channel depth in a bundle declaration; the id must be a parameter in a
 // bundle constructor
-channel_depth	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3]
+channelDepth	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3]
 	: 'unbounded' 
 	{
 		$cd1 = ChannelType.ChanDepth.unbounded;
 		$cd2 = 0;
 		$cd3 = null;
-	}
+	} -> 'unbounded'
 	| INT_LIT 
 	{
 		$cd1 = ChannelType.ChanDepth.finite;
@@ -147,15 +150,15 @@ channel_depth	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3]
 			++errorCount;
 		}
 		$cd3 = null;
-	}
+	} -> INT_LIT
 	| ID
 	{
 		$cd1 = ChannelType.ChanDepth.id;
 		$cd2 = 0;
 		$cd3 = $ID;
-	};
+	} -> ID;
 
-channel_behavior   returns [ChannelType.ChanBehavior b]
+channelBehavior   returns [ChannelType.ChanBehavior b]
 	: 'block'
 	{
 		$b = ChannelType.ChanBehavior.block;
@@ -173,52 +176,77 @@ channel_behavior   returns [ChannelType.ChanBehavior b]
 		$b = ChannelType.ChanBehavior.priority;
 	};
 
-channel_args	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3, ChannelType.ChanBehavior b]
-		: channel_depth ',' channel_behavior 
+channelArgs	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3, ChannelType.ChanBehavior b]
+		: channelDepth ',' channelBehavior 
 		{ 
-			$cd1 = $channel_depth.cd1;
-			$cd2 = $channel_depth.cd2;
-			$cd3 = $channel_depth.cd3;
-			$b = $channel_behavior.b;
-		} -> ^(CHAN_PARAMS channel_depth channel_behavior)
-		| channel_depth 
+			$cd1 = $channelDepth.cd1;
+			$cd2 = $channelDepth.cd2;
+			$cd3 = $channelDepth.cd3;
+			$b = $channelBehavior.b;
+		} -> ^(CHAN_ARGS channelDepth channelBehavior)
+		| channelDepth 
 		{
-			$cd1 = $channel_depth.cd1;
-			$cd2 = $channel_depth.cd2;
-			$cd3 = $channel_depth.cd3;
+			$cd1 = $channelDepth.cd1;
+			$cd2 = $channelDepth.cd2;
+			$cd3 = $channelDepth.cd3;
 			$b = ChannelType.ChanBehavior.block;
-		} -> ^(CHAN_PARAMS channel_depth 'block')
+		} -> ^(CHAN_ARGS channelDepth 'block')
 		| 
 		{
 			$cd1 = ChannelType.ChanDepth.finite;
 			$cd2 = 0;
 			$cd3 = null;
 			$b = ChannelType.ChanBehavior.block;
-		} -> ^(CHAN_PARAMS CHAN_NOBUFFER 'block'); 
+		} -> ^(CHAN_ARGS CHAN_NOBUFFER 'block'); 
 	
 
-channelDec
-	: 'channel' '<' genericArgList '>' '(' channel_args ')' name=ID channel_dir STMT_END 
+bundleStmt
+	: channelDecStmt1 channelDir STMT_END -> ^(BUNDLE_STATEMENT channelDecStmt1 channelDir);
+
+
+channelDecStmt1
+	: chanTypeId '(' channelArgs ')' name=ID   
 	{
+		try {
+		$chanTypeId.ct.setChanArgs($channelArgs.cd1, $channelArgs.cd2, $channelArgs.cd3, $channelArgs.b);
+		} 
+		catch(Exception ex) {
+			System.out.println("caught : " + ex);
+			++errorCount;
+		}
+		// channel variables in bundles are always static to the bundle
+		Vardec v = new Vardec(Vardec.StgClass.Static, $chanTypeId.ct, $name, $name.text, false);
+
+	} -> ^(CHAN_VARDEC_1 chanTypeId channelArgs $name);
 	
-	// TODO the generic version of these types should be builtin types.
-	// For now we'll just search for the final type and add it if it isn't present yet,
-	// but reuse it if it is.
-	// TODO simply using the $genericParamList.text may not result in an exact match
-	String readerEndName = "chanr<" + $genericArgList.text + ">";
-	String writerEndName = "chanw<" + $genericArgList.text + ">";
-	// TODO simply using $channel_params.text may not result in an exact match
-	String channelName = "channel<" + $genericArgList.text + ">(" + $channel_args.text + ")";
-	// all three should either be defined or not; it would be an error for one of them
-	// to be in the symbol table but not the others
-	ChanRType readerType;
-	ChanWType writerType;
-	ChannelType channelType;
+
+channelDecStmt2
+	: paramStorageClass chanTypeId '(' channelArgs ')' name=ID
+	{
+		try {
+		$chanTypeId.ct.setChanArgs($channelArgs.cd1, $channelArgs.cd2, $channelArgs.cd3, $channelArgs.b);
+		}
+		catch (Exception ex) {
+			System.out.println("caught " + ex);
+			++errorCount;
+		}
+		Vardec v;
+		if($paramStorageClass.text.equals("static")) {
+			v = new Vardec(Vardec.StgClass.Static, $chanTypeId.ct, $name, $name.text, false);
+		}
+		else {
+			System.out.println("only static storage class is supported : " 
+				+ $paramStorageClass.start.getText()
+				+ " at "
+				+  $paramStorageClass.start.getLine() 
+				+ ":" + $paramStorageClass.start.getCharPositionInLine());
+			v = new Vardec(Vardec.StgClass.Mobile, $chanTypeId.ct, $name, $name.text, false);
+		}
+		$procDec::currentScope.Symbols.put($name.text, v);
+		$procDec::locals.put(v.EmittedName, v);
+	} -> ^(CHAN_VARDEC_2 paramStorageClass chanTypeId channelArgs $name);
 	
-	
-	} -> ^('channel' genericArgList $name channel_dir);
-	
-channel_dir 	: '->' | '<-';
+channelDir 	: '->' | '<-';
 
 // TODO add constructors
 attrib 		: '[' ID ']' -> ID;
@@ -262,15 +290,17 @@ genericArgList returns [ArrayList<TypeRef> tRefs]
 	{
 		$tRefs = $TypeIdScope::typeRefs;
 	} -> ^(GENERIC_ARGLIST typeId+);
-
-typeId	returns [TypeRef t]
+	
+chanTypeId returns [ChanTypeRef ct]
 	: token='channel' '<' genericArgList '>' 
 	{
-		$t = new TypeRef($token, $genericArgList.tRefs);
-		addTypeRef($t);
-		$TypeIdScope::typeRefs.add($t);
-	} -> 'channel' genericArgList
-	| token='chanr' '<' genericArgList '>' 
+		$ct = new ChanTypeRef($token, $genericArgList.tRefs);
+		addTypeRef($ct);
+		$TypeIdScope::typeRefs.add($ct);
+	} -> 'channel' genericArgList;
+
+typeId	returns [TypeRef t]
+	: token='chanr' '<' genericArgList '>' 
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
@@ -305,14 +335,15 @@ param 		: paramStorageClass typeId name=ID
 			$procDec::locals.put(v.EmittedName, v);
 		} -> ^(PARAM paramStorageClass typeId $name);
 
-statement 	: (while_stmt | if_stmt | cif_stmt | par_stmt | succ_stmt | block | simple_statement);
+statement 	: (whileStmt | ifStmt | cifStmt | parStmt | succStmt | block | simpleStatement);
 
-simple_statement 
-		: vardec_stmt STMT_END -> vardec_stmt
-		| send_stmt STMT_END -> send_stmt
-		| receive_stmt STMT_END -> receive_stmt
-		| assign_stmt STMT_END -> assign_stmt
-		| return_stmt STMT_END -> return_stmt
+simpleStatement 
+		: varDecStmt STMT_END -> varDecStmt
+		| channelDecStmt2 STMT_END -> channelDecStmt2
+		| sendStmt STMT_END -> sendStmt
+		| receiveStmt STMT_END -> receiveStmt
+		| assignStmt STMT_END -> assignStmt
+		| returnStmt STMT_END -> returnStmt
 		| call STMT_END -> call;
 
 block 		
@@ -332,22 +363,22 @@ block
 			}
 		} -> ^(BLOCK statement+);
 
-while_stmt 	: 'while' '(' exp ')' statement
+whileStmt 	: 'while' '(' exp ')' statement
 			-> ^('while' exp statement);
 
-if_stmt		: 'if' '(' exp ')' statement
+ifStmt		: 'if' '(' exp ')' statement
 			-> ^('if' exp statement);
 
-cif_stmt 	: 'cif' '(' ID ')' statement
+cifStmt 	: 'cif' '(' ID ')' statement
 			-> ^('cif' ID statement);
 
-par_stmt	: 'par' block -> ^('par' block);
+parStmt	: 'par' block -> ^('par' block);
 
-succ_stmt	: 'succ' block -> ^('succ' block);
+succStmt	: 'succ' block -> ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile' | -> 'mobile';
 
-vardec_stmt 	: storageClass typeId name=ID varInit
+varDecStmt 	: storageClass typeId name=ID varInit
 		{
 			// TODO created emitted name if there is a conflict in procDec::locals
 			Vardec v = new Vardec(Vardec.StgClass.Static, $typeId.t, $name, $name.text, false);
@@ -359,47 +390,47 @@ varInit		: ('=' exp) -> '=' exp
 		| -> NO_INIT;
 
 
-send_stmt 	: ID '!' exp 
+sendStmt 	: ID '!' exp 
 		{
 		
 		} -> ^('!' ID exp);
 
-receive_stmt	: from=ID '?' target=ID 
+receiveStmt	: from=ID '?' target=ID 
 		{
 		
 		} -> ^('?' $from $target);
 
-assign_stmt 	: ID '='^ exp
+assignStmt 	: ID '='^ exp
 		{
 		
 		};
 
-return_stmt	: 'return' exp -> ^('return' exp);
+returnStmt	: 'return' exp -> ^('return' exp);
 
 //exp	 	: exp1 -> ^(EXP exp1);
 
 //exp1		: bool_exp (comp_op^ bool_exp)*;
 
-exp		: bool_exp (comp_op^ bool_exp)*;
+exp		: boolExp (compOp^ boolExp)*;
  	
-comp_op 	: '<' | '>' | '<=' | '>=' | '==' | '!=';
+compOp 	: '<' | '>' | '<=' | '>=' | '==' | '!=';
 
-bool_exp	: add_exp (bool_op^ add_exp)*;
+boolExp	: addExp (boolOp^ addExp)*;
 
-bool_op 	: 'or' | 'and' | 'xor';
+boolOp 	: 'or' | 'and' | 'xor';
 
-add_exp		: mult_exp (add_op^ mult_exp)*;
+addExp		: multExp (addOp^ multExp)*;
 
-add_op 		: '+' | '-';
+addOp 		: '+' | '-';
 
-mult_exp	: unary_exp (mult_op^ unary_exp)*;
+multExp	: unaryExp (multOp^ unaryExp)*;
 
-mult_op 	: '*' | '/';
+multOp 	: '*' | '/';
 
-unary_exp	: unary_prefix_op^ atom
+unaryExp	: unaryPrefixOp^ atom
 			| atom;
 
-unary_prefix_op : 'not' | '+' | '-';
+unaryPrefixOp : 'not' | '+' | '-';
 
  	
 atom 		: literal 
@@ -411,46 +442,40 @@ atom 		: literal
 pool		: 'static' | 'local' | ID;
 
 		
-constructor	: 'new' '(' pool ')' typeId '(' arg_list ')' 
+constructor	: 'new' '(' pool ')' typeId '(' argList ')' 
 		{
-		// type is a constructable type (right now limited to channels)
-		// pool is the location to allocate
-		// 	static - static allocation in a proc's context
-		//	local - envelope of a MobileObject
-		//		alternate ideas 'this'
-		//		name of reference if allocating from an enclosing proc with
-		//		an envelope reference
-		//	msg - system global pool
-		//	app - app global pool (similar to traditional heap; in fact will use malloc
-		//		at first)
-		//	<UserDefinedPool> - A custom pool specified by the user
-		// Right now we'll support static only, TODO the rest
-		if( ! $pool.text.equals("static") ){
-			System.out.println(
-				"unknown pool:"
-				+ $pool.text
-				+ " at "
-				+ $pool.start.getLine() + ":" + $pool.start.getCharPositionInLine());
-			++errorCount;
-		}
-		DanType conType = types.get($typeId.text);
-		if(conType == null){
-			System.out.println(
-				"unknown type: "
-				+ $typeId.text
-				+ " at "
-				+ $typeId.start.getLine() + ":" + $typeId.start.getCharPositionInLine());
-			++errorCount;
-		}
-		} -> ^(CONSTRUCTOR pool typeId arg_list);
+			// type is a constructable type (right now limited to channels)
+			// pool is the location to allocate
+			// 	static - static allocation in a proc's context
+			//	local - envelope of a MobileObject
+			//		alternate ideas 'this'
+			//		name of reference if allocating from an enclosing proc with
+			//		an envelope reference
+			//	msg - system global pool
+			//	app - app global pool (similar to traditional heap; in fact will use malloc
+			//		at first)
+			//	<UserDefinedPool> - A custom pool specified by the user
+			// Right now we'll support static only, TODO the rest
+			if( ! $pool.text.equals("static") ){
+				System.out.println(
+					"unknown pool:"
+					+ $pool.text
+					+ " at "
+					+ $pool.start.getLine() + ":" + $pool.start.getCharPositionInLine());
+				++errorCount;
+			}
+		} -> ^(CONSTRUCTOR pool typeId argList);
 
-call 		: ID '(' arg_list ')' 
+call 		: ID '(' argList ')' 
 		{
 			// ID is either a proc type or a method call on a custom type
 			// TODO right now we just search types; add method calls
 			TypeRef tRef = new TypeRef($ID);
 			// need to allocate storage for the call (only recursive procs are dynamically allocated, so this allocates in the caller's context)
-			// TODO need unique names if calling the same proc more than once in a par
+			// TODO what we really need is a way to generically allocate and reuse the same space
+			// So, allocate an array of char that is big enough to hold the largest set of procs in a par.
+			// And then we need a way to reference those procs.  Could use pointers in the locals structure, but that doesn't really scale.
+			// Could also use raw offsets, but that is cryptic.  Will probably win out though.
 			String emittedName = "__p" + $ID.text;
 			// we use the ID as the token here so we can report error information if the proc type isn't found; 
 			// not because it is really the name of the vardec
@@ -460,9 +485,9 @@ call 		: ID '(' arg_list ')'
 			addTypeRef(tRef);
 			$TypeIdScope::typeRefs.add(tRef);
 		
-		} -> ^(CALL ID arg_list);
+		} -> ^(CALL ID argList);
 
-arg_list 	: exp  (',' exp)* -> ^(ARGLIST exp+)
+argList 	: exp  (',' exp)* -> ^(ARGLIST exp+)
 		| -> ^(ARGLIST NO_ARG);
 
 literal 	: bool_lit | FLOAT_LIT | INT_LIT;
