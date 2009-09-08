@@ -5,8 +5,10 @@
  */
 package dan.types;
 
+import java.util.HashMap;
 import org.antlr.runtime.Token;
 
+// TODO consider chaning to PrimitiveType (only covers static fixed size builtin types)
 public class BuiltinType extends DanType {
 
     public enum Builtins {
@@ -14,7 +16,7 @@ public class BuiltinType extends DanType {
         Void,
         Bool,
         Int32,
-        Uint32,
+        UInt32,
         Float32
     }
     /* 
@@ -29,26 +31,36 @@ public class BuiltinType extends DanType {
     //public static final int Int16 = 21;
     public static final int Int32 = 22;
     //public static final int Int64 = 23;
-    //public static final int Int = 30;
-    //public static final int Num = 31;
+    //public static final int Int = 30; // TODO move to a mobile builtins class
+    //public static final int Num = 31; // TODO move to a mobile builtins class
     public static final int Float32 = 40;
     //public static final int Float64 = 41;
-    //public static final int String8 = 50;
-    //public static final int String16 = 51;
-    //public static final int String32 = 52;
-    // TODO add builtin array and channel types
-    public static final int 
-    // TODO add builtin exception types
-    
-    // TODO add base Object type
-    // TODO add base CustomObject type 
      */
-    public final Builtins type;
 
-    public BuiltinType(Builtins t) {
-        // TODO this is only true for the primitive types, 
-        // not array and channel types
+    private static final HashMap<String, BuiltinType> typeMap = new HashMap<String, BuiltinType>();
+
+    static {
+        // TODO load from a file representing the targeted runtime instead
+        // for instance, is it a runtime in which bools are 64 bits?
+        typeMap.put(Builtins.Void.toString().toLowerCase(), new BuiltinType(Builtins.Void, 0, "void"));
+        typeMap.put(Builtins.Bool.toString().toLowerCase(), new BuiltinType(Builtins.Bool, 32, "uint32"));
+        typeMap.put(Builtins.Int32.toString().toLowerCase(), new BuiltinType(Builtins.Int32, 32, "int32"));
+        typeMap.put(Builtins.UInt32.toString().toLowerCase(), new BuiltinType(Builtins.UInt32, 32, "uint32"));
+        typeMap.put(Builtins.Float32.toString().toLowerCase(), new BuiltinType(Builtins.Float32, 32, "float"));
+    }
+
+    public static BuiltinType getBuiltinType(String t){
+        return typeMap.get(t.toLowerCase());
+    }
+
+    public final Builtins type;
+    public final int staticSize;
+    public final String emittedType;
+
+    protected BuiltinType(Builtins t, int ssize, String et) {
         type = t;
+        staticSize = ssize;
+        emittedType = et;
     }
     
     
@@ -67,6 +79,19 @@ public class BuiltinType extends DanType {
     @Override
     public boolean isByRef(){
         return false;
+    }
+
+    @Override
+    public int getStaticSize(){
+        return staticSize;
+    }
+
+    @Override
+    public int getMobileSize(){
+        // TODO other possibilities include
+        //      same as static size
+        //      throw an exception
+        return 0;
     }
 
 }

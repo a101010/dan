@@ -5,7 +5,9 @@
  */
 package dan.types;
 
+import dan.system.NotImplementedException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
 
@@ -41,6 +43,16 @@ public class ChannelType extends DanType {
     }
 
     static public int ChannelTokenId = 0;
+
+    static public ChannelType resolveType(ChanTypeRef ctRef, HashMap<String, DanType> typeMap){
+        throw new NotImplementedException();
+    }
+
+    static private final HashMap<String, ChannelType> = new HashMap<String, ChannelType>();
+
+    static {
+        // TODO get from a file in the directory corresponding to the correct runtime
+    }
 
     protected ChanDepth chanDepth1;
     protected int chanDepth2;

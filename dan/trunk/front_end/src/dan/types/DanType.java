@@ -3,6 +3,7 @@ package dan.types;
 import java.util.ArrayList;
 import org.antlr.runtime.Token;
 import dan.system.*;
+import java.util.HashMap;
 
 // TODO need to figure out where to handle generic types
 // It may need to be in DanType, since protocols and channels
@@ -13,6 +14,21 @@ import dan.system.*;
  */
 public class DanType {
 
+    static public DanType resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
+        DanType retVal = tRef.getResolvedType();
+        if(retVal != null){
+            return retVal;
+        }
+        if(tRef.getName().getText().equals("channel")){
+            ChanTypeRef ctRef = (ChanTypeRef) tRef;
+            ChannelType.resolveType(ctRef, typeMap);
+        }
+        for(TypeRef tRefA: tRef.genArgs){
+            tRefA.setResolvedType(resolveType(tRefA, typeMap));
+        }
+        throw new NotImplementedException();
+    }
+    
     /**
      * In a recursive symbol, gets the rightmost type.
      * 
@@ -79,6 +95,16 @@ public class DanType {
 
     public ArrayList<TypeRef> getGenericArgs(){
         return genericArgs;
+    }
+
+    // in bits
+    public int getStaticSize(){
+        return 0;
+    }
+
+    // in bits
+    public int getMobileSize(){
+        return 32;
     }
     
 }
