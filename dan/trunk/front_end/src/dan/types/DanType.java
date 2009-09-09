@@ -14,19 +14,24 @@ import java.util.HashMap;
  */
 public class DanType {
 
-    static public DanType resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
+    static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
         DanType retVal = tRef.getResolvedType();
         if(retVal != null){
-            return retVal;
+            return ;
         }
         if(tRef.getName().getText().equals("channel")){
             ChanTypeRef ctRef = (ChanTypeRef) tRef;
             ChannelType.resolveType(ctRef, typeMap);
+            return;
         }
         for(TypeRef tRefA: tRef.genArgs){
-            tRefA.setResolvedType(resolveType(tRefA, typeMap));
+            resolveType(tRefA, typeMap);
         }
-        throw new NotImplementedException();
+        DanType resolvedType = typeMap.get(tRef.getName().getText());
+        if(resolvedType == null){
+            throw new TypeException(tRef.getName(), "type definition not found");
+        }
+        tRef.setResolvedType(resolvedType);
     }
     
     /**
@@ -49,19 +54,26 @@ public class DanType {
             return member;
         }
     }
-            
+
+    protected String name;
     protected Token token;
-    protected ArrayList<TypeRef> genericArgs;
+    protected ArrayList<DanType> genericArgs;
     
     public DanType(){
        
     }
     
     public DanType(Token t) {
+        name = t.getText();
         token = t;
     }
 
+    public DanType(String n) {
+        name = n;
+    }
+
     public void setToken(Token t) throws TypeException {
+        name = t.getText();
         token = t;
     }
 
@@ -70,7 +82,7 @@ public class DanType {
     }
 
     public String getName() {
-       return token.getText();
+       return name;
     }
     
     public final DanType getMemberType(String id){
@@ -93,7 +105,7 @@ public class DanType {
         return true;
     }
 
-    public ArrayList<TypeRef> getGenericArgs(){
+    public ArrayList<DanType> getGenericArgs(){
         return genericArgs;
     }
 
