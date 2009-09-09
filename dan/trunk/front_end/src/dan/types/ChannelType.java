@@ -44,14 +44,17 @@ public class ChannelType extends DanType {
 
     static public int ChannelTokenId = 0;
 
-    static public ChannelType resolveType(ChanTypeRef ctRef, HashMap<String, DanType> typeMap){
+    static public void resolveType(ChanTypeRef ctRef, HashMap<String, DanType> typeMap){
         throw new NotImplementedException();
     }
 
-    static private final HashMap<String, ChannelType> = new HashMap<String, ChannelType>();
+    // containts a map of emitted channel type names to template instances
+    // template instaces must be tailored to the correct protocol type
+    static private final HashMap<String, ChannelType> emittedChanNameMap = new HashMap<String, ChannelType>();
 
     static {
         // TODO get from a file in the directory corresponding to the correct runtime
+        emittedChanNameMap.put("__c0bs32", new ChannelType("__c0bs32", ChanDepth.finite, 0, null, ChanBehavior.block));
     }
 
     protected ChanDepth chanDepth1;
@@ -61,14 +64,22 @@ public class ChannelType extends DanType {
     protected String strRep;
     protected String emittedTypeRep;
 
-
-    public ChannelType(ArrayList<TypeRef> p, ChanDepth d1, int d2, Token d3, ChanBehavior b){
+    public ChannelType(String et, ChanDepth d1, int d2, Token d3, ChanBehavior b){
         super(new CommonToken(ChannelTokenId, "'channel'"));
-        genericArgs = p;
+        emittedTypeRep = et;
         chanDepth1 = d1;
         chanDepth2 = d2;
         chanDepth3 = d3;
         chanBehavior = b;
+    }
+
+
+
+    public void setProtocol(ArrayList<DanType> p) {
+        if(genericArgs != null){
+            throw new RuntimeException("ChannelType protocol already set");
+        }
+        genericArgs = p;
     }
     
     @Override
