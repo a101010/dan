@@ -6,12 +6,18 @@
 
 package dan.types;
 
+import dan.system.NotImplementedException;
 import org.antlr.runtime.CommonToken;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class ChanRType extends DanType {
 
     static public int ChanrTokenId = 0;
+
+    static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
+        throw new NotImplementedException();
+    }
 
     protected String strRep;
     protected String emittedTypeRep;

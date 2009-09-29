@@ -6,8 +6,10 @@
 
 package dan.types;
 
+import dan.system.NotImplementedException;
 import org.antlr.runtime.CommonToken;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Represents a channel writer end.
@@ -16,6 +18,10 @@ import java.util.ArrayList;
 public class ChanWType extends DanType {
     
     static public int ChanwTokenId = 0;
+
+    static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
+        throw new NotImplementedException();
+    }
 
     protected String strRep;
     protected String emittedTypeRep;

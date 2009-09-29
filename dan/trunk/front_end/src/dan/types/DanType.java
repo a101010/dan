@@ -15,19 +15,51 @@ import java.util.HashMap;
 public class DanType {
 
     static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
-        DanType retVal = tRef.getResolvedType();
-        if(retVal != null){
+        DanType resolvedType = tRef.getResolvedType();
+
+        // check if we've already resolved it; TODO should this be an exception?
+        if(resolvedType != null){
             return ;
         }
+
+        // resolve channel types
         if(tRef.getName().getText().equals("channel")){
             ChanTypeRef ctRef = (ChanTypeRef) tRef;
             ChannelType.resolveType(ctRef, typeMap);
             return;
         }
-        for(TypeRef tRefA: tRef.genArgs){
-            resolveType(tRefA, typeMap);
+
+        // make sure we've resolved all of the generic arg types before we
+        // resolve the type as a whole; 
+        if(tRef.genArgs != null){
+            for(TypeRef tRefA: tRef.genArgs){
+                resolveType(tRefA, typeMap);
+            }
         }
-        DanType resolvedType = typeMap.get(tRef.getName().getText());
+
+        // resolve chanr and chanw
+        if(tRef.getName().getText().equals("chanw")){
+            ChanWType.resolveType(tRef, typeMap);
+            return;
+        }
+
+        if(tRef.getName().getText().equals("chanr")){
+            ChanRType.resolveType(tRef, typeMap);
+            return;
+        }
+
+
+        // is it a builtin type?
+        resolvedType = BuiltinType.getBuiltinType(tRef.getName().getText());
+        if(resolvedType != null){
+            tRef.setResolvedType(resolvedType);
+            return;
+        }
+
+        // resolve from the map, which should include all types
+        // defined in a file or imported by the file
+        // TODO does this correctly handle generic args?
+        resolvedType = typeMap.get(tRef.getName().getText());
         if(resolvedType == null){
             throw new TypeException(tRef.getName(), "type definition not found");
         }
