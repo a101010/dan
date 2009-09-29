@@ -30,16 +30,7 @@ public class DanProgTest {
 
         DanProgParser parser = new DanProgParser(tokens);
         
-        // Initialize the builtin types
-        for(BuiltinType.Builtins b : BuiltinType.Builtins.values()){
-            // duplicate for upper and lower case
-            BuiltinType bType = new BuiltinType(b);
-            parser.types.put(b.name(), bType);
-            parser.types.put(b.name().toLowerCase(), bType);
-        }
-        // TODO Initialize the channel types
-
-
+        
         // Parse input and build AST
         DanProgParser.prog_return result = parser.prog();
 
@@ -62,18 +53,9 @@ public class DanProgTest {
 
         // resolve types
 
-        DanType type;
-        for(String typeName: parser.typeRefs.keySet()){
-            ArrayList<TypeRef> tRefs = parser.typeRefs.get(typeName);
-            type = parser.types.get(typeName);
-            // TODO it might be a channel type or other generic type
-            // TODO add handling for other generic types (and a recursive helper function or two)
-            if(type == null){
-                // TODO add better error handling, including the token's location
-                throw new Exception("type " + typeName + " not found" );
-            }
+        for(ArrayList<TypeRef> tRefs: parser.typeRefs.values()){
             for(TypeRef tRef: tRefs){
-                tRef.setResolvedType(type);
+                DanType.resolveType(tRef, parser.types);
             }
         }
 

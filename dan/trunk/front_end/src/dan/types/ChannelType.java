@@ -45,7 +45,39 @@ public class ChannelType extends DanType {
     static public int ChannelTokenId = 0;
 
     static public void resolveType(ChanTypeRef ctRef, HashMap<String, DanType> typeMap){
-        throw new NotImplementedException();
+        ChannelType resolvedType;
+        if(ctRef.genArgs == null){
+            throw new TypeException(ctRef.getName(), "protocol not specified");
+        }
+        if(ctRef.genArgs.size() == 0){
+            throw new TypeException(ctRef.getName(), "protocol not specified");
+        }
+
+        // resolve protocol types
+        for(TypeRef gaRef: ctRef.genArgs){
+            DanType.resolveType(gaRef, typeMap);
+        }
+
+        if(ctRef.genArgs.size() != 1){
+            // TODO pick a multi-type channel if > 1
+            throw new TypeException(ctRef.getName(), "multi-type channels not supported");
+        }
+        DanType protocol = ctRef.genArgs.get(0).getResolvedType();
+        // TODO handle case of the single generic arg is a protocol type
+
+        // check the size of the generic arg type; only 32 bits currently supported
+        if(protocol.isByRef()){
+            if(protocol.getMobileSize() != 32){
+                throw new TypeException(ctRef.getName(), "only 32 bit channel protocol supported");
+            }
+        }
+        else if (protocol.getStaticSize() != 32){
+            throw new TypeException(ctRef.getName(), "only 32 bit channel protocol supported");
+        }
+
+        // TODO use __c0bs32 as the emmitted type
+        resolvedType = emittedChanNameMap.get("__c0bs32");
+
     }
 
     // containts a map of emitted channel type names to template instances
@@ -138,7 +170,7 @@ public class ChannelType extends DanType {
         if(emittedTypeRep == null){
             emittedTypeRep = "Channel_";
             for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).getResolvedType().getEmittedType();
+                emittedTypeRep += genericArgs.get(i).getEmittedType();
                 emittedTypeRep += "_";
             }
             emittedTypeRep += (chanDepth1 == ChanDepth.unbounded ? chanDepth1 : chanDepth2).toString()
