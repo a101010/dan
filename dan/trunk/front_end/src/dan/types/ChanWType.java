@@ -24,16 +24,25 @@ public class ChanWType extends DanType {
     }
 
     protected String strRep;
-    protected String emittedTypeRep;
+    protected String emittedTypeName;
 
     /**
-     *
-     * @param p The channel protocol
+     * Create a generic ChanWType that needs to have its generic arg list
+     * specified still.
+     * @param etn The emitted type name.
      */
-    public ChanWType(ArrayList<DanType> p){
-        super(new CommonToken(ChanwTokenId, "'chanw'"));
-        genericArgs = p;
+    protected ChanWType(String etn){
+        super(new CommonToken(ChanwTokenId, "chanw"));
+        emittedTypeName = etn;
+        genericArgs = null;
     }
+
+    public ChanWType(ChanWType generic, ArrayList<DanType> ga){
+        super(generic.getToken());
+        emittedTypeName = generic.emittedTypeName;
+        genericArgs = ga;
+    }
+
 
     @Override
     public String getName(){
