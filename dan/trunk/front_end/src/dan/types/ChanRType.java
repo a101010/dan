@@ -31,7 +31,7 @@ public class ChanRType extends DanType {
      * necessary to select the correct channel type) as well as indicating
      * run-time construction.
      */
-    public ChanRType(ArrayList<TypeRef> p){
+    public ChanRType(ArrayList<DanType> p){
         super(new CommonToken(ChanrTokenId, "'chanr'"));
         genericArgs = p;
     }
@@ -56,7 +56,7 @@ public class ChanRType extends DanType {
         if(emittedTypeRep == null){
             emittedTypeRep = "ChanR_";
             for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).resolvedType.getEmittedType();
+                emittedTypeRep += genericArgs.get(i).getEmittedType();
                 if(i != genericArgs.size() - 1)
                     emittedTypeRep += "_";
             }
