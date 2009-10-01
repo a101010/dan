@@ -78,6 +78,7 @@ public class ChannelType extends DanType {
         // TODO use __c0bs32 as the emmitted type
         resolvedType = emittedChanNameMap.get("__c0bs32");
         ctRef.setResolvedType(resolvedType);
+        // TODO add to typeMap? with the key "channel<genericArgs>"
     }
 
     // containts a map of emitted channel type names to template instances

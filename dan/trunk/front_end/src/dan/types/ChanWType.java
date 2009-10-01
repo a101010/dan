@@ -20,7 +20,7 @@ public class ChanWType extends DanType {
     static public int ChanwTokenId = 0;
 
     static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
-        throw new NotImplementedException();
+        ChanWType resolvedType = typeMap.get(tRef.)
     }
 
     protected String strRep;
