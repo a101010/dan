@@ -75,19 +75,28 @@ public class ChannelType extends DanType {
             throw new TypeException(ctRef.getName(), "only 32 bit channel protocol supported");
         }
 
-        // TODO use __c0bs32 as the emmitted type
+        // use __c0bs32 as the emmitted type, but tailor the generic arg list
         resolvedType = emittedChanNameMap.get("__c0bs32");
+        // and populate the channel end types
+        // TODO
+
         ctRef.setResolvedType(resolvedType);
-        // TODO add to typeMap? with the key "channel<genericArgs>"
+        typeMap.put(ctRef.toString(), resolvedType);
     }
 
     // containts a map of emitted channel type names to template instances
     // template instaces must be tailored to the correct protocol type
     static private final HashMap<String, ChannelType> emittedChanNameMap = new HashMap<String, ChannelType>();
 
+    static private final HashMap<ChannelType, ChanWType> emittedChanWMap = new HashMap<ChannelType, ChanWType>();
+    static private final HashMap<ChannelType, ChanRType> emittedChanRMap = new HashMap<ChannelType, ChanRType>();
+
     static {
         // TODO get from a file in the directory corresponding to the correct runtime
-        emittedChanNameMap.put("__c0bs32", new ChannelType("__c0bs32", ChanDepth.finite, 0, null, ChanBehavior.block));
+        ChannelType __c0bs32 = new ChannelType("__c0bs32", ChanDepth.finite, 0, null, ChanBehavior.block);
+        emittedChanNameMap.put("__c0bs32", __c0bs32);
+        emittedChanWMap.put(__c0bs32, new ChanWType(null));
+        emittedChanRMap.put(__c0bs32, new ChanRType(null));
     }
 
     protected ChanDepth chanDepth1;
@@ -164,6 +173,14 @@ public class ChannelType extends DanType {
 
     public ChanBehavior getChanBehavior(){
         return chanBehavior;
+    }
+
+    public ChanRType getChanRType(){
+
+    }
+
+    public ChanWType getChanWType(){
+
     }
 
     @Override
