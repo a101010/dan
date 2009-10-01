@@ -46,23 +46,23 @@ public class ChannelType extends DanType {
 
     static public void resolveType(ChanTypeRef ctRef, HashMap<String, DanType> typeMap){
         ChannelType resolvedType;
-        if(ctRef.genArgs == null){
+        if(ctRef.genericArgs == null){
             throw new TypeException(ctRef.getName(), "protocol not specified");
         }
-        if(ctRef.genArgs.size() == 0){
+        if(ctRef.genericArgs.size() == 0){
             throw new TypeException(ctRef.getName(), "protocol not specified");
         }
 
         // resolve protocol types
-        for(TypeRef gaRef: ctRef.genArgs){
+        for(TypeRef gaRef: ctRef.genericArgs){
             DanType.resolveType(gaRef, typeMap);
         }
 
-        if(ctRef.genArgs.size() != 1){
+        if(ctRef.genericArgs.size() != 1){
             // TODO pick a multi-type channel if > 1
             throw new TypeException(ctRef.getName(), "multi-type channels not supported");
         }
-        DanType protocol = ctRef.genArgs.get(0).getResolvedType();
+        DanType protocol = ctRef.genericArgs.get(0).getResolvedType();
         // TODO handle case of the single generic arg is a protocol type
 
         // check the size of the generic arg type; only 32 bits currently supported
@@ -77,8 +77,7 @@ public class ChannelType extends DanType {
 
         // use __c0bs32 as the emmitted type, but tailor the generic arg list
         resolvedType = emittedChanNameMap.get("__c0bs32");
-        // and populate the channel end types
-        // TODO
+        resolvedType = new ChannelType(resolvedType, ctRef.getGenericArgs());
 
         ctRef.setResolvedType(resolvedType);
         typeMap.put(ctRef.toString(), resolvedType);
@@ -105,14 +104,30 @@ public class ChannelType extends DanType {
     protected ChanBehavior chanBehavior;
     protected String strRep;
     protected String emittedTypeRep;
+    protected ChanWType chanWType;
+    protected ChanRType chanRType;
 
     public ChannelType(String et, ChanDepth d1, int d2, Token d3, ChanBehavior b){
-        super(new CommonToken(ChannelTokenId, "'channel'"));
+        super(new CommonToken(ChannelTokenId, "channel"));
         emittedTypeRep = et;
         chanDepth1 = d1;
         chanDepth2 = d2;
         chanDepth3 = d3;
         chanBehavior = b;
+    }
+
+    protected ChannelType(ChannelType generic, ArrayList<TypeRef> ga){
+        super(new CommonToken(ChannelTokenId, "channel"));
+        ArrayList<DanType> newGa = new ArrayList<DanType>(ga.size());
+        for(TypeRef tRef: ga){
+            newGa.add(tRef.getResolvedType());
+        }
+        emittedTypeRep = generic.emittedTypeRep;
+        chanDepth1 = generic.chanDepth1;
+        chanDepth2 = generic.chanDepth2;
+        chanDepth3 = generic.chanDepth3;
+        chanBehavior = generic.chanBehavior;
+
     }
 
 
@@ -176,11 +191,11 @@ public class ChannelType extends DanType {
     }
 
     public ChanRType getChanRType(){
-
+        throw new NotImplementedException();
     }
 
     public ChanWType getChanWType(){
-
+        throw new NotImplementedException();
     }
 
     @Override
