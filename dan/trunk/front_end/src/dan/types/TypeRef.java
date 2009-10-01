@@ -16,6 +16,7 @@ import java.util.ArrayList;
  * @author Alan
  */
 public class TypeRef {
+    // TODO need to add a way to get the name used for lookup in typeMap, including genericArgs
     protected Token name;
     protected ArrayList<TypeRef> genArgs;
     protected DanType resolvedType;
