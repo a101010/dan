@@ -18,13 +18,13 @@ import java.util.ArrayList;
 public class TypeRef {
     
     protected Token name;
-    protected ArrayList<TypeRef> genArgs;
+    protected ArrayList<TypeRef> genericArgs;
     protected DanType resolvedType;
     protected String stringRep;
 
     public TypeRef(Token n, ArrayList<TypeRef> ga){
         name = n;
-        genArgs = ga;
+        genericArgs = ga;
     }
 
     public TypeRef(Token n){
@@ -36,7 +36,7 @@ public class TypeRef {
     }
 
     public ArrayList<TypeRef> getGenericArgs(){
-        return genArgs;
+        return genericArgs;
     }
 
     public DanType getResolvedType(){
@@ -47,15 +47,27 @@ public class TypeRef {
         resolvedType = t;
     }
 
+    public String getGenericArgsAsString(){
+        String strRep = "<";
+        for(int i = 0; i < genericArgs.size(); ++i){
+            strRep += genericArgs.get(i).getName().getText();
+            if(i != genericArgs.size() - 1){
+                strRep += ", ";
+            }
+        }
+        strRep += ">";
+        return strRep;
+    }
+    
     @Override
     public String toString(){
         if(stringRep == null){
             stringRep = name.getText();
-            if(genArgs != null){
+            if(genericArgs != null){
                 stringRep += "<";
-                for(int i = 0; i < genArgs.size(); ++i){
-                    stringRep += genArgs.get(i).toString();
-                    if(i != genArgs.size() - 1){
+                for(int i = 0; i < genericArgs.size(); ++i){
+                    stringRep += genericArgs.get(i).toString();
+                    if(i != genericArgs.size() - 1){
                         stringRep += ", ";
                     }
                 }

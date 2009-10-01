@@ -31,8 +31,8 @@ public class DanType {
 
         // make sure we've resolved all of the generic arg types before we
         // resolve the type as a whole; 
-        if(tRef.genArgs != null){
-            for(TypeRef tRefA: tRef.genArgs){
+        if(tRef.genericArgs != null){
+            for(TypeRef tRefA: tRef.genericArgs){
                 resolveType(tRefA, typeMap);
             }
         }
@@ -139,6 +139,18 @@ public class DanType {
 
     public ArrayList<DanType> getGenericArgs(){
         return genericArgs;
+    }
+
+    public String getGenericArgsAsString(){
+        String strRep = "<";
+        for(int i = 0; i < genericArgs.size(); ++i){
+            strRep += genericArgs.get(i).getName();
+            if(i != genericArgs.size() - 1){
+                strRep += ", ";
+            }
+        }
+        strRep += ">";
+        return strRep;
     }
 
     // in bits

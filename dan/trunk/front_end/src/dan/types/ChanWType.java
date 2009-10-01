@@ -20,7 +20,19 @@ public class ChanWType extends DanType {
     static public int ChanwTokenId = 0;
 
     static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
-        ChanWType resolvedType = typeMap.get(tRef.)
+
+        ChanWType resolvedType = (ChanWType) typeMap.get(tRef.toString());
+        if(resolvedType == null){
+            ChannelType chanType = (ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString());
+            if(chanType == null){
+
+
+                TypeRef ctRef = new ChanTypeRef(new CommonToken(ChannelType.ChannelTokenId, "channel"), tRef.getGenericArgs());
+                ChannelType.resolveType(ctRef, typeMap);
+                chanType = (ChannelType) ctRef.getResolvedType();
+            }
+            resolvedType = ((ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString())).getChanWType();
+        }
     }
 
     protected String strRep;
@@ -47,28 +59,13 @@ public class ChanWType extends DanType {
     @Override
     public String getName(){
         if(strRep == null){
-            strRep = "chanw<";
-            for(int i = 0; i < genericArgs.size(); ++i){
-                strRep += genericArgs.get(i).getName();
-                if(i != genericArgs.size() - 1){
-                    strRep += ", ";
-                }
-            }
-            strRep += ">";
+            strRep = "chanw" + getGenericArgsAsString();
         }
         return strRep;
     }
 
     @Override
     public String getEmittedType(){
-        if(emittedTypeRep == null){
-            emittedTypeRep = "ChanW_";
-            for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).getEmittedType();
-                if(i != genericArgs.size() - 1)
-                    emittedTypeRep += "_";
-            }
-        }
-        return emittedTypeRep;
+        return emittedTypeName;
     }
 }
