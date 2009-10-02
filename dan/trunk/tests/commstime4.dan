@@ -73,10 +73,10 @@ proc void Commstime()
 {
     // Statically allocated channels are allocated in the locals
     // space of the proc.
-	static channel<int32> a = new(static) channel<int32>(0);
-	static channel<int32> b = new(static) channel<int32>(0);
-	static channel<int32> c = new(static) channel<int32>(0);
-	static channel<int32> d = new(static) channel<int32>(0);
+	static channel<int32>(0) a = new(static) channel<int32>(0);
+	static channel<int32>(0) b = new(static) channel<int32>(0);
+	static channel<int32>(0) c = new(static) channel<int32>(0);
+	static channel<int32>(0) d = new(static) channel<int32>(0);
 	par
 	{
         // For static channels, channel ends may only be passed to procs that are
