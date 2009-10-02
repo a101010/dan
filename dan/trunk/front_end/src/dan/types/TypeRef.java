@@ -17,22 +17,35 @@ import java.util.ArrayList;
  */
 public class TypeRef {
     
-    protected Token name;
+    protected Token token;
     protected ArrayList<TypeRef> genericArgs;
     protected DanType resolvedType;
-    protected String stringRep;
+    protected String name;
+    protected String longName;
 
-    public TypeRef(Token n, ArrayList<TypeRef> ga){
-        name = n;
+    public TypeRef(Token t, ArrayList<TypeRef> ga){
+        token = t;
         genericArgs = ga;
     }
 
     public TypeRef(Token n){
-        name = n;
+        token = n;
+        name = token.getText();
     }
 
-    public Token getName(){
+    public Token getToken(){
+        return token;
+    }
+
+    public String getName(){
         return name;
+    }
+
+    public String getLongName(){
+        if(longName == null){
+            longName = name + getGenericArgsAsString();
+        }
+        return longName;
     }
 
     public ArrayList<TypeRef> getGenericArgs(){
@@ -48,9 +61,15 @@ public class TypeRef {
     }
 
     public String getGenericArgsAsString(){
+        if(genericArgs == null){
+            return "";
+        }
+        if(genericArgs.size() < 1){
+            return "";
+        }
         String strRep = "<";
         for(int i = 0; i < genericArgs.size(); ++i){
-            strRep += genericArgs.get(i).getName().getText();
+            strRep += genericArgs.get(i).getLongName();
             if(i != genericArgs.size() - 1){
                 strRep += ", ";
             }
@@ -61,19 +80,6 @@ public class TypeRef {
     
     @Override
     public String toString(){
-        if(stringRep == null){
-            stringRep = name.getText();
-            if(genericArgs != null){
-                stringRep += "<";
-                for(int i = 0; i < genericArgs.size(); ++i){
-                    stringRep += genericArgs.get(i).toString();
-                    if(i != genericArgs.size() - 1){
-                        stringRep += ", ";
-                    }
-                }
-                stringRep +=">";
-            }
-        }
-        return stringRep;
+        return longName;
     }
 }

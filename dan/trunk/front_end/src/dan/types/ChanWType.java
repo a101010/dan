@@ -23,6 +23,7 @@ public class ChanWType extends DanType {
 
         ChanWType resolvedType = (ChanWType) typeMap.get(tRef.toString());
         if(resolvedType == null){
+            // TODO this won't work; need to use GenArgsUtils.getMaxSizeByRef
             ChannelType chanType = (ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString());
             if(chanType == null){
 

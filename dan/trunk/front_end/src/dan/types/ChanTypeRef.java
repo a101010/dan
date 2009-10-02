@@ -6,6 +6,7 @@
 
 package dan.types;
 
+import dan.system.NotImplementedException;
 import java.util.ArrayList;
 import org.antlr.runtime.Token;
 
@@ -77,5 +78,38 @@ public class ChanTypeRef extends TypeRef {
             throw new Exception("ChanTypeRef: attempt to getChanBehavior before setChanArgs");
         }
         return chanBehavior;
+    }
+
+    @Override
+    public String getName(){
+        return "channel";
+    }
+
+    @Override
+    public String getLongName(){
+        if(longName == null){
+            longName = "channel" + getGenericArgsAsString() + getChanParamsAsString();
+        }
+        return longName;
+    }
+
+    public String getChanParamsAsString(){
+        String chanDepthStr;
+        if(chanDepth1 == ChannelType.ChanDepth.finite){
+            return Integer.toString(chanDepth2);
+        }
+        else if (chanDepth1 == ChannelType.ChanDepth.id){
+            throw new NotImplementedException();
+            // TODO need a way to look up the id; then as for finite
+            // the id must be a compile time constant integer
+        }
+        else if (chanDepth1 == ChannelType.ChanDepth.unbounded){
+            chanDepthStr = "unbounded";
+        }        
+        else{
+            throw new RuntimeException("unhandled channel depth: " + chanDepth1);
+        }
+
+        return "(" + chanDepthStr + ", " + chanBehavior.toString() + ")";
     }
 }
