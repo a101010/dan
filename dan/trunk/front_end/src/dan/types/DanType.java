@@ -23,7 +23,7 @@ public class DanType {
         }
 
         // resolve channel types
-        if(tRef.getName().getText().equals("channel")){
+        if(tRef.getToken().getText().equals("channel")){
             ChanTypeRef ctRef = (ChanTypeRef) tRef;
             ChannelType.resolveType(ctRef, typeMap);
             return;
@@ -38,19 +38,19 @@ public class DanType {
         }
 
         // resolve chanr and chanw
-        if(tRef.getName().getText().equals("chanw")){
+        if(tRef.getToken().getText().equals("chanw")){
             ChanWType.resolveType(tRef, typeMap);
             return;
         }
 
-        if(tRef.getName().getText().equals("chanr")){
+        if(tRef.getToken().getText().equals("chanr")){
             ChanRType.resolveType(tRef, typeMap);
             return;
         }
 
 
         // is it a builtin type?
-        resolvedType = BuiltinType.getBuiltinType(tRef.getName().getText());
+        resolvedType = BuiltinType.getBuiltinType(tRef.getToken().getText());
         if(resolvedType != null){
             tRef.setResolvedType(resolvedType);
             return;
@@ -59,9 +59,9 @@ public class DanType {
         // resolve from the map, which should include all types
         // defined in a file or imported by the file
         // TODO does this correctly handle generic args?
-        resolvedType = typeMap.get(tRef.getName().getText());
+        resolvedType = typeMap.get(tRef.getToken().getText());
         if(resolvedType == null){
-            throw new TypeException(tRef.getName(), "type definition not found");
+            throw new TypeException(tRef.getToken(), "type definition not found");
         }
         tRef.setResolvedType(resolvedType);
     }
@@ -88,6 +88,7 @@ public class DanType {
     }
 
     protected String name;
+    protected String longName;
     protected Token token;
     protected ArrayList<DanType> genericArgs;
     
@@ -142,6 +143,12 @@ public class DanType {
     }
 
     public String getGenericArgsAsString(){
+        if(genericArgs == null){
+            return "";
+        }
+        if(genericArgs.size() < 1){
+            return "";
+        }
         String strRep = "<";
         for(int i = 0; i < genericArgs.size(); ++i){
             strRep += genericArgs.get(i).getName();

@@ -46,11 +46,18 @@ public class ChannelType extends DanType {
 
     static public void resolveType(ChanTypeRef ctRef, HashMap<String, DanType> typeMap){
         ChannelType resolvedType;
+        resolvedType = (ChannelType) typeMap.get(ctRef.toString());
+
+        if(resolvedType != null){
+            ctRef.setResolvedType(resolvedType);
+            return;
+        }
+
         if(ctRef.genericArgs == null){
-            throw new TypeException(ctRef.getName(), "protocol not specified");
+            throw new TypeException(ctRef.getToken(), "protocol not specified");
         }
         if(ctRef.genericArgs.size() == 0){
-            throw new TypeException(ctRef.getName(), "protocol not specified");
+            throw new TypeException(ctRef.getToken(), "protocol not specified");
         }
 
         // resolve protocol types
@@ -60,7 +67,7 @@ public class ChannelType extends DanType {
 
         if(ctRef.genericArgs.size() != 1){
             // TODO pick a multi-type channel if > 1
-            throw new TypeException(ctRef.getName(), "multi-type channels not supported");
+            throw new TypeException(ctRef.getToken(), "multi-type channels not supported");
         }
         DanType protocol = ctRef.genericArgs.get(0).getResolvedType();
         // TODO handle case of the single generic arg is a protocol type
@@ -68,11 +75,11 @@ public class ChannelType extends DanType {
         // check the size of the generic arg type; only 32 bits currently supported
         if(protocol.isByRef()){
             if(protocol.getMobileSize() != 32){
-                throw new TypeException(ctRef.getName(), "only 32 bit channel protocol supported");
+                throw new TypeException(ctRef.getToken(), "only 32 bit channel protocol supported");
             }
         }
         else if (protocol.getStaticSize() != 32){
-            throw new TypeException(ctRef.getName(), "only 32 bit channel protocol supported");
+            throw new TypeException(ctRef.getToken(), "only 32 bit channel protocol supported");
         }
 
         // use __c0bs32 as the emmitted type, but tailor the generic arg list
@@ -141,21 +148,34 @@ public class ChannelType extends DanType {
     
     @Override
     public String getName(){
-        if(strRep == null){
-            strRep = "channel<";
-            for(int i = 0; i < genericArgs.size(); ++i){
-                strRep += genericArgs.get(i).getName();
-                if(i != genericArgs.size() - 1){
-                    strRep += ", ";
-                }
-            }
-            strRep += ">(" 
-                    + (chanDepth1 == ChanDepth.unbounded ? chanDepth1 : chanDepth2).toString()
-                    + ", "
-                    + chanBehavior.toString()
-                    + ")";
+        return "channel";
+    }
+
+    public String getLongName(){
+        if(longName == null){
+            longName = getName() + getGenericArgsAsString() + getChanParamsAsString();
         }
-        return strRep;
+        return longName;
+    }
+
+    public String getChanParamsAsString(){
+        String chanDepthStr;
+        if(chanDepth1 == ChannelType.ChanDepth.finite){
+            return Integer.toString(chanDepth2);
+        }
+        else if (chanDepth1 == ChannelType.ChanDepth.id){
+            throw new NotImplementedException();
+            // TODO need a way to look up the id; then as for finite
+            // the id must be a compile time constant integer
+        }
+        else if (chanDepth1 == ChannelType.ChanDepth.unbounded){
+            chanDepthStr = "unbounded";
+        }
+        else{
+            throw new RuntimeException("unhandled channel depth: " + chanDepth1);
+        }
+
+        return "(" + chanDepthStr + ", " + chanBehavior.toString() + ")";
     }
 
     public ChanDepth getChanDepth1(){
@@ -200,16 +220,6 @@ public class ChannelType extends DanType {
 
     @Override
     public String getEmittedType(){
-        if(emittedTypeRep == null){
-            emittedTypeRep = "Channel_";
-            for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).getEmittedType();
-                emittedTypeRep += "_";
-            }
-            emittedTypeRep += (chanDepth1 == ChanDepth.unbounded ? chanDepth1 : chanDepth2).toString()
-                    + "_"
-                    + chanBehavior.toString();
-        }
         return emittedTypeRep;
     }
 }

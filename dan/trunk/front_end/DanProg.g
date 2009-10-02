@@ -14,6 +14,7 @@ tokens
 	BUNDLE_STATEMENT;
 	BUNDLE_PROTOCOL;
 	CALL;
+	CHAN_CONSTRUCTOR;
 	CHAN_DEF;
 	CHAN_ARGS;
 	CHAN_NOBUFFER;
@@ -205,31 +206,17 @@ bundleStmt
 
 
 channelDecStmt1
-	: chanTypeId '(' channelArgs ')' name=ID   
+	: chanTypeId  name=ID   
 	{
-		try {
-		$chanTypeId.ct.setChanArgs($channelArgs.cd1, $channelArgs.cd2, $channelArgs.cd3, $channelArgs.b);
-		} 
-		catch(Exception ex) {
-			System.out.println("caught : " + ex);
-			++errorCount;
-		}
 		// channel variables in bundles are always static to the bundle
 		Vardec v = new Vardec(Vardec.StgClass.Static, $chanTypeId.ct, $name, $name.text, false);
 
-	} -> ^(CHAN_VARDEC_1 chanTypeId channelArgs $name);
+	} -> ^(CHAN_VARDEC_1 chanTypeId $name);
 	
 
 channelDecStmt2
-	: paramStorageClass chanTypeId '(' channelArgs ')' name=ID
+	: paramStorageClass chanTypeId name=ID
 	{
-		try {
-		$chanTypeId.ct.setChanArgs($channelArgs.cd1, $channelArgs.cd2, $channelArgs.cd3, $channelArgs.b);
-		}
-		catch (Exception ex) {
-			System.out.println("caught " + ex);
-			++errorCount;
-		}
 		Vardec v;
 		if($paramStorageClass.text.equals("static")) {
 			v = new Vardec(Vardec.StgClass.Static, $chanTypeId.ct, $name, $name.text, false);
@@ -244,7 +231,7 @@ channelDecStmt2
 		}
 		$procDec::currentScope.Symbols.put($name.text, v);
 		$procDec::locals.put(v.EmittedName, v);
-	} -> ^(CHAN_VARDEC_2 paramStorageClass chanTypeId channelArgs $name);
+	} -> ^(CHAN_VARDEC_2 paramStorageClass chanTypeId $name);
 	
 channelDir 	: '->' | '<-';
 
@@ -292,12 +279,19 @@ genericArgList returns [ArrayList<TypeRef> tRefs]
 	} -> ^(GENERIC_ARGLIST typeId+);
 	
 chanTypeId returns [ChanTypeRef ct]
-	: token='channel' '<' genericArgList '>' 
+	: token='channel' '<' genericArgList '>' '(' channelArgs ')'
 	{
 		$ct = new ChanTypeRef($token, $genericArgList.tRefs);
 		addTypeRef($ct);
 		$TypeIdScope::typeRefs.add($ct);
-	} -> 'channel' genericArgList;
+		try {
+			$chanTypeId.ct.setChanArgs($channelArgs.cd1, $channelArgs.cd2, $channelArgs.cd3, $channelArgs.b);
+		}
+		catch (Exception ex) {
+			System.out.println("caught " + ex);
+			++errorCount;
+		}
+	} -> 'channel' genericArgList channelArgs;
 
 typeId	returns [TypeRef t]
 	: token='chanr' '<' genericArgList '>' 
@@ -464,7 +458,8 @@ constructor	: 'new' '(' pool ')' typeId '(' argList ')'
 					+ $pool.start.getLine() + ":" + $pool.start.getCharPositionInLine());
 				++errorCount;
 			}
-		} -> ^(CONSTRUCTOR pool typeId argList);
+		} ->  ^(CONSTRUCTOR pool typeId argList)
+		| 'new' '(' pool ')' chanTypeId -> ^(CHAN_CONSTRUCTOR pool chanTypeId);
 
 call 		: ID '(' argList ')' 
 		{

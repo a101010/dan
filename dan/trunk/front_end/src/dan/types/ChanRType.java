@@ -16,7 +16,18 @@ public class ChanRType extends DanType {
     static public int ChanrTokenId = 0;
 
     static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
-        throw new NotImplementedException();
+        ChanRType resolvedType = (ChanRType) typeMap.get(tRef.toString());
+        if(resolvedType == null){
+            ChannelType chanType = (ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString());
+            if(chanType == null){
+
+
+                TypeRef ctRef = new ChanTypeRef(new CommonToken(ChannelType.ChannelTokenId, "channel"), tRef.getGenericArgs());
+                ChannelType.resolveType(ctRef, typeMap);
+                chanType = (ChannelType) ctRef.getResolvedType();
+            }
+            resolvedType = ((ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString())).getChanRType();
+        }
     }
 
     protected String strRep;
