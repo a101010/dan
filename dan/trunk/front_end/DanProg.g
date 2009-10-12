@@ -228,6 +228,7 @@ channelDecStmt2
 				+  $paramStorageClass.start.getLine() 
 				+ ":" + $paramStorageClass.start.getCharPositionInLine());
 			v = new Vardec(Vardec.StgClass.Mobile, $chanTypeId.ct, $name, $name.text, false);
+			++errorCount;
 		}
 		$procDec::currentScope.Symbols.put($name.text, v);
 		$procDec::locals.put(v.EmittedName, v);

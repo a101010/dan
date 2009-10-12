@@ -94,15 +94,11 @@ public class ChannelType extends DanType {
     // template instaces must be tailored to the correct protocol type
     static private final HashMap<String, ChannelType> emittedChanNameMap = new HashMap<String, ChannelType>();
 
-    static private final HashMap<ChannelType, ChanWType> emittedChanWMap = new HashMap<ChannelType, ChanWType>();
-    static private final HashMap<ChannelType, ChanRType> emittedChanRMap = new HashMap<ChannelType, ChanRType>();
 
     static {
         // TODO get from a file in the directory corresponding to the correct runtime
         ChannelType __c0bs32 = new ChannelType("__c0bs32", ChanDepth.finite, 0, null, ChanBehavior.block);
         emittedChanNameMap.put("__c0bs32", __c0bs32);
-        emittedChanWMap.put(__c0bs32, new ChanWType(null));
-        emittedChanRMap.put(__c0bs32, new ChanRType(null));
     }
 
     protected ChanDepth chanDepth1;
@@ -111,8 +107,6 @@ public class ChannelType extends DanType {
     protected ChanBehavior chanBehavior;
     protected String strRep;
     protected String emittedTypeRep;
-    protected ChanWType chanWType;
-    protected ChanRType chanRType;
 
     public ChannelType(String et, ChanDepth d1, int d2, Token d3, ChanBehavior b){
         super(new CommonToken(ChannelTokenId, "channel"));
