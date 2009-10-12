@@ -51,6 +51,10 @@ public class DanProgTest {
         
         System.out.println("Number of errors: " + parser.errorCount);
 
+        if(parser.errorCount > 0){
+            System.exit(parser.errorCount);
+        }
+
         // resolve types
 
         for(ArrayList<TypeRef> tRefs: parser.typeRefs.values()){

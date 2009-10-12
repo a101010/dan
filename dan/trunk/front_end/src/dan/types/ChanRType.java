@@ -16,35 +16,100 @@ public class ChanRType extends DanType {
     static public int ChanrTokenId = 0;
 
     static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
+
         ChanRType resolvedType = (ChanRType) typeMap.get(tRef.toString());
         if(resolvedType == null){
-            ChannelType chanType = (ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString());
-            if(chanType == null){
+            // use GenArgsUtils.getMaxSizeByRef to find out:
+            //  - what our biggest size is (TODO 32 or 64, need to support arbitrary sized statically allocated also,
+            //    TODO only 32 bit supported right now)
+            //  - whether we can use simpler 1 type channels or need to use channels that
+            //    handle multiple types (TODO only single type supported right now)
 
+            // Heh, right now we could just spit out the only combination we support, but lets at least put
+            // the plumbing in place and verify it works for that case.
 
-                TypeRef ctRef = new ChanTypeRef(new CommonToken(ChannelType.ChannelTokenId, "channel"), tRef.getGenericArgs());
-                ChannelType.resolveType(ctRef, typeMap);
-                chanType = (ChannelType) ctRef.getResolvedType();
+            // First, resolve the TypeRef generic type arg list
+            ArrayList<TypeRef> genArgs = tRef.getGenericArgs();
+            if(genArgs == null){
+                // This should never happen; it should be caught by the parser, not at type resolution time.
+                throw new RuntimeException("fix the parser; a chanw type must have generic args and this should be caught in parsing");
             }
-            resolvedType = ((ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString())).getChanRType();
+            if(genArgs.size() == 0){
+                // This should never happen; it should be caught by the parser, not at type resolution time.
+                throw new RuntimeException("fix the parser; a chanw type must have generic args and this should be caught in parsing");
+            }
+            ArrayList<DanType> resolvedGenArgs = new ArrayList<DanType>(genArgs.size());
+            for(TypeRef tr: genArgs){
+                DanType.resolveType(tr, typeMap);
+                resolvedGenArgs.add(tr.getResolvedType());
+            }
+
+            int largestType;
+            boolean singleType;
+            ArrayList<Integer> sizeAndNumber = GenArgsUtils.getMaxSizeByRef(resolvedGenArgs);
+            largestType = sizeAndNumber.get(0);
+            if(sizeAndNumber.get(1) == 1){
+                singleType = true;
+            }
+            else{
+                singleType = false;
+            }
+            if(largestType > 64){
+                throw new RuntimeException("types with mobile (byRef) size larger than 64 not supported");
+            }
+            if(largestType > 32){
+                throw new RuntimeException("types with mobile (byRef) size larger than 32 not supported");
+            }
+            if(largestType < 32){
+                // we can fit smaller sizes into a 32 bit slot
+                largestType = 32;
+            }
+            if(largestType == 32){
+                if(singleType){
+                    resolvedType = emittedChanRNameMap.get("__ChanR32");
+
+                }
+                else{
+                    throw new RuntimeException("protocols with multilple types not supported");
+                }
+            }
         }
     }
 
+    // containts a map of emitted channel reader end type names to template instances
+    // template instaces must be tailored to the correct protocol type
+    static private final HashMap<String, ChanRType> emittedChanRNameMap = new HashMap<String, ChanRType>();
+
+
+    static {
+        // TODO get from a file in the directory corresponding to the correct runtime
+        ChanRType __ChanR32 = new ChanRType("__ChanR32");
+        emittedChanRNameMap.put("__ChanR32", __ChanR32);
+    }
+
     protected String strRep;
-    protected String emittedTypeRep;
+    protected String emittedTypeName;
 
     /**
-     * A reference to a channel type.
-     *
-     * Type references are resolved after the first compiler pass.
-     * The channel parameters are assigned when the channel is "constructed".
-     * Contruction completes the type reference (i.e. has compile time info
-     * necessary to select the correct channel type) as well as indicating
-     * run-time construction.
+     * Create a generic ChanRType that needs to have its generic arg list
+     * specified still.
+     * @param etn The emitted type name.
      */
-    public ChanRType(ArrayList<DanType> p){
-        super(new CommonToken(ChanrTokenId, "'chanr'"));
-        genericArgs = p;
+    protected ChanRType(String etn){
+        super(new CommonToken(ChanrTokenId, "chanr"));
+        emittedTypeName = etn;
+        genericArgs = null;
+    }
+
+    /**
+     * Create a ChanRType tailored from a generic emitted type.
+     * @param generic - the generic ChanRType to tailor
+     * @param ga - the channel protocol to tailor to
+     */
+    public ChanRType(ChanRType generic, ArrayList<DanType> ga){
+        super(generic.getToken());
+        emittedTypeName = generic.emittedTypeName;
+        genericArgs = ga;
     }
     
     @Override
@@ -64,15 +129,8 @@ public class ChanRType extends DanType {
 
     @Override
     public String getEmittedType(){
-        if(emittedTypeRep == null){
-            emittedTypeRep = "ChanR_";
-            for(int i = 0; i < genericArgs.size(); ++i){
-                emittedTypeRep += genericArgs.get(i).getEmittedType();
-                if(i != genericArgs.size() - 1)
-                    emittedTypeRep += "_";
-            }
-        }
-        return emittedTypeRep;
+
+        return emittedTypeName;
     }
 
 

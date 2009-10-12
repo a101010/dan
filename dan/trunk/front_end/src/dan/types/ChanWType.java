@@ -23,17 +23,72 @@ public class ChanWType extends DanType {
 
         ChanWType resolvedType = (ChanWType) typeMap.get(tRef.toString());
         if(resolvedType == null){
-            // TODO this won't work; need to use GenArgsUtils.getMaxSizeByRef
-            ChannelType chanType = (ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString());
-            if(chanType == null){
+            // use GenArgsUtils.getMaxSizeByRef to find out:
+            //  - what our biggest size is (TODO 32 or 64, need to support arbitrary sized statically allocated also,
+            //    TODO only 32 bit supported right now)
+            //  - whether we can use simpler 1 type channels or need to use channels that
+            //    handle multiple types (TODO only single type supported right now)
 
+            // Heh, right now we could just spit out the only combination we support, but lets at least put
+            // the plumbing in place and verify it works for that case.
 
-                TypeRef ctRef = new ChanTypeRef(new CommonToken(ChannelType.ChannelTokenId, "channel"), tRef.getGenericArgs());
-                ChannelType.resolveType(ctRef, typeMap);
-                chanType = (ChannelType) ctRef.getResolvedType();
+            // First, resolve the TypeRef generic type arg list
+            ArrayList<TypeRef> genArgs = tRef.getGenericArgs();
+            if(genArgs == null){
+                // This should never happen; it should be caught by the parser, not at type resolution time.
+                throw new RuntimeException("fix the parser; a chanw type must have generic args and this should be caught in parsing");
             }
-            resolvedType = ((ChannelType) typeMap.get("channel" + tRef.getGenericArgsAsString())).getChanWType();
+            if(genArgs.size() == 0){
+                // This should never happen; it should be caught by the parser, not at type resolution time.
+                throw new RuntimeException("fix the parser; a chanw type must have generic args and this should be caught in parsing");
+            }
+            ArrayList<DanType> resolvedGenArgs = new ArrayList<DanType>(genArgs.size());
+            for(TypeRef tr: genArgs){
+                DanType.resolveType(tr, typeMap);
+                resolvedGenArgs.add(tr.getResolvedType());
+            }
+
+            int largestType;
+            boolean singleType;
+            ArrayList<Integer> sizeAndNumber = GenArgsUtils.getMaxSizeByRef(resolvedGenArgs);
+            largestType = sizeAndNumber.get(0);
+            if(sizeAndNumber.get(1) == 1){
+                singleType = true;
+            }
+            else{
+                singleType = false;
+            }
+            if(largestType > 64){
+                throw new RuntimeException("types with mobile (byRef) size larger than 64 not supported");
+            }
+            if(largestType > 32){
+                throw new RuntimeException("types with mobile (byRef) size larger than 32 not supported");
+            }
+            if(largestType < 32){
+                // we can fit smaller sizes into a 32 bit slot
+                largestType = 32;
+            }
+            if(largestType == 32){
+                if(singleType){
+                    resolvedType = emittedChanWNameMap.get("__ChanW32");
+
+                }
+                else{
+                    throw new RuntimeException("protocols with multilple types not supported");
+                }
+            }
         }
+    }
+
+    // containts a map of emitted channel writer end type names to template instances
+    // template instaces must be tailored to the correct protocol type
+    static private final HashMap<String, ChanWType> emittedChanWNameMap = new HashMap<String, ChanWType>();
+
+
+    static {
+        // TODO get from a file in the directory corresponding to the correct runtime
+        ChanWType __ChanW32 = new ChanWType("__ChanW32");
+        emittedChanWNameMap.put("__ChanW32", __ChanW32);
     }
 
     protected String strRep;
@@ -50,6 +105,11 @@ public class ChanWType extends DanType {
         genericArgs = null;
     }
 
+    /**
+     * Create a ChanWType tailored from a generic emitted type.
+     * @param generic - the generic ChanWType to tailor
+     * @param ga - the channel protocol to tailor to
+     */
     public ChanWType(ChanWType generic, ArrayList<DanType> ga){
         super(generic.getToken());
         emittedTypeName = generic.emittedTypeName;
