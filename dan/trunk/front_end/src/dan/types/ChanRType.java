@@ -67,7 +67,7 @@ public class ChanRType extends DanType {
             if(largestType == 32){
                 if(singleType){
                     resolvedType = emittedChanRNameMap.get("__ChanR32");
-
+                    tRef.setResolvedType(resolvedType);
                 }
                 else{
                     throw new RuntimeException("protocols with multilple types not supported");

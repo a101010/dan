@@ -60,6 +60,26 @@ public class DanProgTest {
         for(ArrayList<TypeRef> tRefs: parser.typeRefs.values()){
             for(TypeRef tRef: tRefs){
                 DanType.resolveType(tRef, parser.types);
+                DanType resolvedType = tRef.getResolvedType();
+                if(resolvedType == null){
+                    throw new RuntimeException("unresolved typeref: " + tRef.getLongName());
+                }
+                else {
+                    System.out.println("type " + tRef.getLongName() + " resolved as " + resolvedType.getEmittedType());
+                }
+            }
+        }
+
+        // ensure all TypeRefs resolved
+        for(ArrayList<TypeRef> tRefs: parser.typeRefs.values()){
+            for(TypeRef tRef: tRefs){
+                DanType resolvedType = tRef.getResolvedType();
+                if(resolvedType == null){
+                    throw new RuntimeException("unresolved typeref: " + tRef.getLongName());
+                }
+                else {
+                    System.out.println("type " + tRef.getLongName() + " resolved as " + resolvedType.getEmittedType());
+                }
             }
         }
 
