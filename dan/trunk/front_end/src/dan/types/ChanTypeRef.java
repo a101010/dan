@@ -25,9 +25,9 @@ public class ChanTypeRef extends TypeRef {
         super(n, ga);
     }
 
-    public void setChanArgs(ChannelType.ChanDepth cd1, int cd2, Token cd3, ChannelType.ChanBehavior cb) throws Exception {
+    public void setChanArgs(ChannelType.ChanDepth cd1, int cd2, Token cd3, ChannelType.ChanBehavior cb) {
         if(chanArgsSet){
-            throw new Exception("ChanTypeRef: attempt to setChanArgs twice");
+            throw new RuntimeException("ChanTypeRef: attempt to setChanArgs twice");
         }
         chanDepth1 = cd1;
         chanDepth2 = cd2;
@@ -36,9 +36,9 @@ public class ChanTypeRef extends TypeRef {
         chanArgsSet = true;
     }
 
-    public ChannelType.ChanDepth getChanDepth1() throws Exception {
+    public ChannelType.ChanDepth getChanDepth1() {
         if(!chanArgsSet){
-            throw new Exception("ChanTypeRef: attempt to getChanDepth1 before setChanArgs");
+            throw new RuntimeException("ChanTypeRef: attempt to getChanDepth1 before setChanArgs");
         }
         return chanDepth1;
     }
@@ -51,9 +51,9 @@ public class ChanTypeRef extends TypeRef {
      * Only valid if chanDepth1 == finite.
      * @return
      */
-    public int getChanDepth2() throws Exception {
+    public int getChanDepth2() {
         if(!chanArgsSet){
-            throw new Exception("ChanTypeRef: attempt to getChanDepth2 before setChanArgs");
+            throw new RuntimeException("ChanTypeRef: attempt to getChanDepth2 before setChanArgs");
         }
         return chanDepth2;
     }
@@ -66,16 +66,16 @@ public class ChanTypeRef extends TypeRef {
      * if chanDepth1 == parameterized.
      * @return
      */
-    public Token getChanDepth3() throws Exception {
+    public Token getChanDepth3() {
         if(!chanArgsSet){
-            throw new Exception("ChanTypeRef: attempt to getChanDepth3 before setChanArgs");
+            throw new RuntimeException("ChanTypeRef: attempt to getChanDepth3 before setChanArgs");
         }
         return chanDepth3;
     }
 
-    public ChannelType.ChanBehavior getChanBehavior() throws Exception {
+    public ChannelType.ChanBehavior getChanBehavior() {
         if(!chanArgsSet){
-            throw new Exception("ChanTypeRef: attempt to getChanBehavior before setChanArgs");
+            throw new RuntimeException("ChanTypeRef: attempt to getChanBehavior before setChanArgs");
         }
         return chanBehavior;
     }
@@ -95,15 +95,16 @@ public class ChanTypeRef extends TypeRef {
 
     public String getChanParamsAsString(){
         String chanDepthStr;
-        if(chanDepth1 == ChannelType.ChanDepth.finite){
+        ChannelType.ChanDepth cd1 = getChanDepth1();
+        if(cd1 == ChannelType.ChanDepth.finite){
             return Integer.toString(chanDepth2);
         }
-        else if (chanDepth1 == ChannelType.ChanDepth.id){
+        else if (cd1 == ChannelType.ChanDepth.id){
             throw new NotImplementedException();
             // TODO need a way to look up the id; then as for finite
             // the id must be a compile time constant integer
         }
-        else if (chanDepth1 == ChannelType.ChanDepth.unbounded){
+        else if (cd1 == ChannelType.ChanDepth.unbounded){
             chanDepthStr = "unbounded";
         }        
         else{

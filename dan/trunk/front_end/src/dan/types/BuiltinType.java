@@ -88,10 +88,7 @@ public class BuiltinType extends DanType {
 
     @Override
     public int getMobileSize(){
-        // TODO other possibilities include
-        //      same as static size
-        //      throw an exception
-        return 0;
+        return staticSize;
     }
 
 }

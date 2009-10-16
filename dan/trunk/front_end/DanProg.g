@@ -283,7 +283,7 @@ chanTypeId returns [ChanTypeRef ct]
 	: token='channel' '<' genericArgList '>' '(' channelArgs ')'
 	{
 		$ct = new ChanTypeRef($token, $genericArgList.tRefs);
-		addTypeRef($ct);
+		
 		$TypeIdScope::typeRefs.add($ct);
 		try {
 			$chanTypeId.ct.setChanArgs($channelArgs.cd1, $channelArgs.cd2, $channelArgs.cd3, $channelArgs.b);
@@ -292,6 +292,7 @@ chanTypeId returns [ChanTypeRef ct]
 			System.out.println("caught " + ex);
 			++errorCount;
 		}
+		addTypeRef($ct);
 	} -> 'channel' genericArgList channelArgs;
 
 typeId	returns [TypeRef t]

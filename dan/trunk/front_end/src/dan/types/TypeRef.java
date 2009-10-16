@@ -26,10 +26,11 @@ public class TypeRef {
     public TypeRef(Token t, ArrayList<TypeRef> ga){
         token = t;
         genericArgs = ga;
+        name = token.getText();
     }
 
-    public TypeRef(Token n){
-        token = n;
+    public TypeRef(Token t){
+        token = t;
         name = token.getText();
     }
 
@@ -80,6 +81,6 @@ public class TypeRef {
     
     @Override
     public String toString(){
-        return longName;
+        return getLongName();
     }
 }

@@ -71,10 +71,10 @@ public class ChanWType extends DanType {
             if(largestType == 32){
                 if(singleType){
                     resolvedType = emittedChanWNameMap.get("__ChanW32");
-
+                    tRef.setResolvedType(resolvedType);
                 }
                 else{
-                    throw new RuntimeException("protocols with multilple types not supported");
+                    throw new RuntimeException("protocols with multiple types not supported");
                 }
             }
         }
