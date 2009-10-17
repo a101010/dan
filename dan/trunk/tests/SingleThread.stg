@@ -320,10 +320,6 @@ parStatement() ::= <<
 
 >>
 
-genericTypeId(id, ga) ::= <<
-<id>\<<ga; separator=", ">\>
->>
-
 typeId(id) ::= <<
 <id>
 >>

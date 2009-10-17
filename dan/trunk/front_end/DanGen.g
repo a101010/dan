@@ -79,8 +79,9 @@ channelDepth	: 'unbounded' | INT_LIT | ID;
 
 channelBehavior : 'block' | 'overflow' | 'overwrite' | 'priority';
 
-channelArgs	: ^(CHAN_ARGS channelBehavior channelDepth)
-		| ^(CHAN_ARGS CHAN_NOBUFFER 'block');
+/*channelArgs	: ^(CHAN_ARGS1 channelDepth channelBehavior)
+		| ^(CHAN_ARGS3 CHAN_NOBUFFER 'block')
+		| ^(CHAN_ARGS2 channelDepth 'block');*/
 
 bundleStmt	: ^(BUNDLE_STATEMENT channelDecStmt1 channelDir)
 		{
@@ -116,13 +117,13 @@ bundleStmt	: ^(BUNDLE_STATEMENT channelDecStmt1 channelDir)
 		};
 	
 channelDecStmt1	returns [String name]
-		:  ^(CHAN_VARDEC_1 chanTypeId channelArgs ID)
+		:  ^(CHAN_VARDEC_1 chanTypeId ID)
 		{
 			$name = $ID.text;
 		};
 		
 channelDecStmt2 
-	:	 ^(CHAN_VARDEC_2 paramStorageClass chanTypeId channelArgs ID);
+	:	 ^(CHAN_VARDEC_2 paramStorageClass chanTypeId ID);
 		
 	
 channelDir 	returns [boolean forward]
@@ -208,14 +209,17 @@ procDec 	scope
 
 paramList 	: ^(PARAMLIST rameses+=param*) -> paramList(params={$rameses});
 
-genericArgList	: ^(GENERIC_ARGLIST tIds+=typeId+) -> genericArgList(args={$tIds});
+genericArgList	: ^(GENERIC_ARGLIST tIds+=typeId+);
 	
-chanTypeId  	: 'channel' genericArgList { System.out.println("type is channel<>"); } -> genericTypeId(id={"channel"}, ga={$genericArgList.st});
+chanTypeId  	: ^('channel' /*genericArgList channelArgs*/ CT_REF)
+		{
+			System.out.println("got a chanTypeId with attached longname: " + $CT_REF.text);
+		};
 
 typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
-		| 'chanr' genericArgList { System.out.println("type is chanr<>"); } -> genericTypeId(id={"chanr"}, ga={$genericArgList.st})
-		| 'chanw' genericArgList { System.out.println("type is chanw<>"); } -> genericTypeId(id={"chanw"}, ga={$genericArgList.st})
-		| GENERIC_TYPE ID genericArgList {System.out.println("type is " + $ID + "<>"); } -> genericTypeId(id={$ID}, ga={$genericArgList.st}); 
+		| 'chanr' genericArgList { System.out.println("type is chanr<>"); }
+		| 'chanw' genericArgList { System.out.println("type is chanw<>"); }
+		| GENERIC_TYPE ID genericArgList {System.out.println("type is " + $ID + "<>"); }; 
 		
 paramStorageClass
 	:	'static' | 'mobile';
@@ -238,6 +242,7 @@ statement 	: (whileStmt | ifStmt | cifStmt | parStmt | succStmt | block | simple
 
 simpleStatement 
 		: varDecStmt
+			| channelDecStmt2
 			| sendStmt
 			| receiveStmt
 			| assignStmt
