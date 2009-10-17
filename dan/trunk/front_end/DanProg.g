@@ -16,11 +16,14 @@ tokens
 	CALL;
 	CHAN_CONSTRUCTOR;
 	CHAN_DEF;
-	CHAN_ARGS;
+	CHAN_ARGS1;
+	CHAN_ARGS2;
+	CHAN_ARGS3;
 	CHAN_NOBUFFER;
 	CHAN_VARDEC_1;
 	CHAN_VARDEC_2;
 	CONSTRUCTOR;
+	CT_REF;
 	DECLARATION;
 	EXP;
 	GENERIC_TYPE;
@@ -184,21 +187,22 @@ channelArgs	returns [ChannelType.ChanDepth cd1, int cd2, Token cd3, ChannelType.
 			$cd2 = $channelDepth.cd2;
 			$cd3 = $channelDepth.cd3;
 			$b = $channelBehavior.b;
-		} -> ^(CHAN_ARGS channelDepth channelBehavior)
+		} //-> ^(CHAN_ARGS1 channelDepth channelBehavior)
 		| channelDepth 
 		{
 			$cd1 = $channelDepth.cd1;
 			$cd2 = $channelDepth.cd2;
 			$cd3 = $channelDepth.cd3;
 			$b = ChannelType.ChanBehavior.block;
-		} -> ^(CHAN_ARGS channelDepth 'block')
+		} //-> ^(CHAN_ARGS2 channelDepth 'block')
 		| 
 		{
 			$cd1 = ChannelType.ChanDepth.finite;
 			$cd2 = 0;
 			$cd3 = null;
 			$b = ChannelType.ChanBehavior.block;
-		} -> ^(CHAN_ARGS CHAN_NOBUFFER 'block'); 
+		/*} -> ^(CHAN_ARGS3 CHAN_NOBUFFER 'block'); */
+		};
 	
 
 bundleStmt
@@ -293,7 +297,7 @@ chanTypeId returns [ChanTypeRef ct]
 			++errorCount;
 		}
 		addTypeRef($ct);
-	} -> 'channel' genericArgList channelArgs;
+	} -> ^('channel' /*genericArgList channelArgs*/ CT_REF[$token, $ct.getLongName()]);
 
 typeId	returns [TypeRef t]
 	: token='chanr' '<' genericArgList '>' 
