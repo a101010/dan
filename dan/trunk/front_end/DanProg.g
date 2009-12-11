@@ -35,6 +35,7 @@ tokens
 	PARAMLIST;
 	PROGRAM;
 	SIMPLE_TYPE;
+	T_REF;
 	VARDEC;
 	VARINIT;
 }
@@ -305,25 +306,25 @@ typeId	returns [TypeRef t]
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 		$TypeIdScope::typeRefs.add($t);
-	} -> 'chanr' genericArgList
+	} -> 'chanr' genericArgList T_REF[$token, $t.getLongName()]
 	| token='chanw' '<' genericArgList '>' 
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 		$TypeIdScope::typeRefs.add($t);
-	} -> 'chanw' genericArgList
+	} -> 'chanw' genericArgList T_REF[$token, $t.getLongName()]
 	| token=ID '<' genericArgList '>' 
 	{
 		$t = new TypeRef($token, $genericArgList.tRefs);
 		addTypeRef($t);
 		$TypeIdScope::typeRefs.add($t);
-	} -> GENERIC_TYPE ID genericArgList
-	| ID
+	} -> GENERIC_TYPE ID genericArgList T_REF[$token, $t.getLongName()]
+	| token=ID
 	{
 		$t = new TypeRef($ID);
 		addTypeRef($t);
 		$TypeIdScope::typeRefs.add($t);
-	} -> SIMPLE_TYPE ID;
+	} -> SIMPLE_TYPE ID  T_REF[$token, $t.getLongName()];
 
 paramStorageClass 
 	:	'static' | 'mobile' | -> 'mobile';
