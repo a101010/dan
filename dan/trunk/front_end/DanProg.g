@@ -412,13 +412,17 @@ returnStmt	: 'return' exp -> ^('return' exp);
 
 //exp1		: bool_exp (comp_op^ bool_exp)*;
 
-exp		: boolExp (compOp^ boolExp)*;
- 	
-compOp 	: '<' | '>' | '<=' | '>=' | '==' | '!=';
+exp		: compExp (boolOp^ compExp)*;
 
-boolExp	: addExp (boolOp^ addExp)*;
+// TODO not sure I like the precedence between boolean and comparison operators	
+compOp 		: '<' | '>' | '<=' | '>=' | '==' | '!=';
 
-boolOp 	: 'or' | 'and' | 'xor';
+//boolExp		: compExp (boolOp^ compExp)*;
+
+boolOp 		: 'or' | 'and' | 'xor';
+
+compExp 	: addExp (compOp^ addExp)*; 
+	
 
 addExp		: multExp (addOp^ multExp)*;
 
@@ -431,7 +435,7 @@ multOp 	: '*' | '/';
 unaryExp	: unaryPrefixOp^ atom
 			| atom;
 
-unaryPrefixOp : 'not' | '+' | '-';
+unaryPrefixOp : '+' | '-' | 'not';
 
  	
 atom 		: literal 

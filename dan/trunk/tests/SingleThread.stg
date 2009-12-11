@@ -293,18 +293,23 @@ default:
 
 >>
 
-assignmentStatement(target, targetCleanup, source) ::= <<
+assignmentStatement(target, targetCleanup, source, sourceCleanup) ::= <<
 locals-><target> = <source>;
 <targetCleanup>
+<sourceCleanup>
 
 >>
 
 binaryOp(left, right, op) ::= <<
-(left op right)
+(<left> <op> <right>)
+>>
+
+xorOp(left, right) ::= <<
+((<left> && !(<right>)) || (!(<left>) && <right>))
 >>
 
 unaryOp(op, operand) ::= <<
-(op operand)
+<op>(<operand>)
 >>
 
 simpleStatement(statement) ::= <<

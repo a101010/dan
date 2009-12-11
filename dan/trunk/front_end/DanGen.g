@@ -238,26 +238,26 @@ param 		: ^(PARAM paramStorageClass typeId name=ID)
 			retval.st = paramTemplate;*/
 		} -> param(type={$typeId.st}, name={$name});
 
-statement 	: whileStmt -> template(while={" while "}) "<while>" 
+statement 	: whileStmt -> template(while={$whileStmt.st}) "<while>" 
 			| ifStmt -> template(if={" if "}) "<if>" 
 			| cifStmt  -> template(cif={" cif "}) "<cif>" 
 			| parStmt  -> template(par={" par "}) "<par>" 
 			| succStmt  -> template(succ={" succ "}) "<succ>" 
 			| block  -> template(block={$block.st}) "<block>"
-			| simpleStatement -> template(simple={" simple statement "}) "<simple>";
+			| simpleStatement -> template(s={$simpleStatement.st}) "<s>";
 
 simpleStatement 
-		: varDecStmt
-			| channelDecStmt2
-			| sendStmt
-			| receiveStmt
-			| assignStmt
-			| returnStmt
-			| call -> template(call={"call proc()"}) "<call>";
+		: varDecStmt -> template(varDec={" varDec "}) "<varDec>"
+			| channelDecStmt2 -> template(chanDec={" chanDec "}) "<chanDec>"
+			| sendStmt -> template(send={" send "}) "<send>"
+			| receiveStmt -> template(receive={" receive "}) "<receive>"
+			| assignStmt -> template(assign={$assignStmt.st}) "<assign>"
+			| returnStmt -> template(return={" return "}) "<return>"
+			| call -> template(call={" call proc() "}) "<call>";
 
 block 		: ^(BLOCK statements+=statement+) -> template(statements={$statements}) "<statements>";
 
-whileStmt 	: ^('while' exp statement);
+whileStmt 	: ^('while' exp statement) -> whileStatement(condition={$exp.st}, statements={$statement.st});
 
 ifStmt		: ^('if' exp statement);
 
@@ -277,38 +277,51 @@ sendStmt 	: ^('!' ID exp) { $procDec::hasIo = true; };
 
 receiveStmt	: ^('?' from=ID target=ID) { $procDec::hasIo = true; };
 
-assignStmt 	: ^('=' ID exp) -> ;
+assignStmt 	: ^('=' ID exp) -> assignmentStatement(target={$ID.text}, 
+						               targetCleanup={""},
+						               source={$exp.st},
+						               sourceCleanup={""});
 
 returnStmt	: ^('return' exp);
 
-exp	 	: literal
-		| ID
-		| constructor
-		| call
-		| ^('<' exp exp) 
-		| ^('>' exp exp)
-		| ^('<=' exp exp) 
-		| ^('>=' exp exp)
-		| ^('==' exp exp)
-		| ^('!=' exp exp)
-		| ^('or' exp exp)
-		| ^('and' exp exp)
-		| ^('xor' exp exp)
-		| (^('+' exp exp))=> ^('+' exp exp)
-		| (^('-' exp exp))=> ^('-' exp exp)
-		| ^('*' exp exp)
-		| ^('/' exp exp)
-		| ^('not' exp)
-		| ^('+' exp)
-		| ^('-' exp);
+
+exp	 	: literal -> template(literal={$literal.st}) "<literal>"
+		| ID  -> template(id={$ID.text}) "locals-><id>"
+		| constructor -> template(construct={" constructor "}) "<construct>"
+		| call  { $exp.st = $call.st; }
+		| ^('<' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<"})
+		| ^('>' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">"})
+		| ^('<=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<="})
+		| ^('>=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">="})
+		| ^('==' left=exp right=exp)-> binaryOp(left={$left.st}, right={$right.st}, op={"=="})
+		| ^('!=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"!="})
+		| ^('or' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"||"})
+		| ^('and' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"&&"})
+		| ^('xor' left=exp right=exp) -> xorOp(left={$left.st}, right={$right.st})
+		| (^('+' exp exp))=> ^('+' left=exp right=exp) 
+			-> binaryOp(left={$left.st}, right={$right.st}, op={"+"})
+		| (^('-' exp exp))=> ^('-' left=exp right=exp)
+			-> binaryOp(left={$left.st}, right={$right.st}, op={"-"})
+		| ^('*' left=exp right=exp)-> binaryOp(left={$left.st}, right={$right.st}, op={"*"})
+		| ^('/' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"/"})
+		| ^('not' operand=exp) -> unaryOp(op={"!"}, operand={$operand.st})
+		| ^('+' operand=exp) ->  unaryOp(op={""}, operand={$operand.st})
+		| ^('-' operand=exp) ->  unaryOp(op={"-"}, operand={$operand.st});
+// TODO using binaryOp this way hard codes the operators here rather than making them part of the template
+// Need to either make the operator part of the template or load a file of operator symbols.
+// Really would like templates that can support various asm flavors, but will leave that for a future effort.		
+
 
 pool		: 'static' | 'local' | ID;
 
 constructor	: ^(CONSTRUCTOR pool typeId argList);
 		
-call		: ^(CALL ID argList);
+call		: ^(CALL ID argList) -> template(call={" call "}) "<call>";
 
 argList 	: ^(ARGLIST exp+)
 		| ^(ARGLIST NO_ARG);
 
-literal 	: 'true' | 'false' | FLOAT_LIT | INT_LIT;
+literal 	: 'true' { $literal.st = new StringTemplate("1"); } 
+			| 'false' { $literal.st = new StringTemplate("0"); } 
+			| FLOAT_LIT { $literal.st = new StringTemplate($FLOAT_LIT.text); }
+			| INT_LIT {$literal.st = new StringTemplate($INT_LIT.text); };
