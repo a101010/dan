@@ -408,16 +408,9 @@ assignStmt 	: ID '='^ exp
 
 returnStmt	: 'return' exp -> ^('return' exp);
 
-//exp	 	: exp1 -> ^(EXP exp1);
-
-//exp1		: bool_exp (comp_op^ bool_exp)*;
-
 exp		: compExp (boolOp^ compExp)*;
 
-// TODO not sure I like the precedence between boolean and comparison operators	
 compOp 		: '<' | '>' | '<=' | '>=' | '==' | '!=';
-
-//boolExp		: compExp (boolOp^ compExp)*;
 
 boolOp 		: 'or' | 'and' | 'xor';
 
