@@ -202,7 +202,7 @@ procDec 	scope
 					               .put("params", $paramList.st)
 					               .put("initLocals", "<initLocals>")
 					               .put("procBodyScratchInit", scratchInit)
-					               .put("statements", "<block>")
+					               .put("statements", $block.st)
 					               .put("cleanup", "<cleanup>")
 					               );
 		};
@@ -216,10 +216,10 @@ chanTypeId  	: ^('channel' /*genericArgList channelArgs*/ CT_REF)
 			System.out.println("got a chanTypeId with attached longname: " + $CT_REF.text);
 		};
 
-typeId		: SIMPLE_TYPE ID { System.out.println("type is " + $ID); } -> typeId(id={$ID})
-		| 'chanr' genericArgList { System.out.println("type is chanr<>"); }
-		| 'chanw' genericArgList { System.out.println("type is chanw<>"); }
-		| GENERIC_TYPE ID genericArgList {System.out.println("type is " + $ID + "<>"); }; 
+typeId		: SIMPLE_TYPE ID T_REF { System.out.println("DanGen: type is " + $T_REF.text); } -> typeId(id={$ID})
+		| 'chanr' genericArgList T_REF { System.out.println("DanGen: type is " + $T_REF.text); }
+		| 'chanw' genericArgList T_REF { System.out.println("DanGen: type is " + $T_REF.text); }
+		| GENERIC_TYPE ID genericArgList T_REF {System.out.println("type is " + $T_REF.text); }; 
 		
 paramStorageClass
 	:	'static' | 'mobile';
@@ -238,7 +238,13 @@ param 		: ^(PARAM paramStorageClass typeId name=ID)
 			retval.st = paramTemplate;*/
 		} -> param(type={$typeId.st}, name={$name});
 
-statement 	: (whileStmt | ifStmt | cifStmt | parStmt | succStmt | block | simpleStatement);
+statement 	: whileStmt -> template(while={" while "}) "<while>" 
+			| ifStmt -> template(if={" if "}) "<if>" 
+			| cifStmt  -> template(cif={" cif "}) "<cif>" 
+			| parStmt  -> template(par={" par "}) "<par>" 
+			| succStmt  -> template(succ={" succ "}) "<succ>" 
+			| block  -> template(block={$block.st}) "<block>"
+			| simpleStatement -> template(simple={" simple statement "}) "<simple>";
 
 simpleStatement 
 		: varDecStmt
@@ -247,9 +253,9 @@ simpleStatement
 			| receiveStmt
 			| assignStmt
 			| returnStmt
-			| call;
+			| call -> template(call={"call proc()"}) "<call>";
 
-block 		: ^(BLOCK statement+) -> template(statements={"<statements>"}) "<statements>";
+block 		: ^(BLOCK statements+=statement+) -> template(statements={$statements}) "<statements>";
 
 whileStmt 	: ^('while' exp statement);
 
@@ -271,7 +277,7 @@ sendStmt 	: ^('!' ID exp) { $procDec::hasIo = true; };
 
 receiveStmt	: ^('?' from=ID target=ID) { $procDec::hasIo = true; };
 
-assignStmt 	: ^('=' ID exp);
+assignStmt 	: ^('=' ID exp) -> ;
 
 returnStmt	: ^('return' exp);
 
