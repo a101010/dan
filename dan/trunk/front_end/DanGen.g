@@ -150,6 +150,8 @@ procDec 	scope
 			ArrayList<StringTemplate> scratchInit;
 			boolean hasIo;
 			boolean hasPar;
+			// labelNum is for saveState labels
+			int labelNum;
 		}
 		@init
 		{
@@ -164,6 +166,7 @@ procDec 	scope
 			$procDec::scratchInit = new ArrayList<StringTemplate>();
 			$procDec::hasIo = false;
 			$procDec::hasPar = false;
+			$procDec::labelNum = 0;
 		}
 		: ^('proc' returnType=ID name=ID { $procDec::type = (ProcType) types.get($name.text); } paramList block) 
 		{
@@ -200,10 +203,10 @@ procDec 	scope
 					new STAttrMap().put("procType", $name)
 					               .put("locals", locals)
 					               .put("params", $paramList.st)
-					               .put("initLocals", "<initLocals>")
+					               .put("initLocals", "// initLocals")
 					               .put("procBodyScratchInit", scratchInit)
 					               .put("statements", $block.st)
-					               .put("cleanup", "<cleanup>")
+					               .put("cleanup", "// cleanup")
 					               );
 		};
 
@@ -238,28 +241,28 @@ param 		: ^(PARAM paramStorageClass typeId name=ID)
 			retval.st = paramTemplate;*/
 		} -> param(type={$typeId.st}, name={$name});
 
-statement 	: whileStmt -> template(while={$whileStmt.st}) "<while>" 
-			| ifStmt -> template(if={" if "}) "<if>" 
-			| cifStmt  -> template(cif={" cif "}) "<cif>" 
-			| parStmt  -> template(par={" par "}) "<par>" 
-			| succStmt  -> template(succ={" succ "}) "<succ>" 
-			| block  -> template(block={$block.st}) "<block>"
-			| simpleStatement -> template(s={$simpleStatement.st}) "<s>";
+statement 	: whileStmt { $statement.st = $whileStmt.st; }
+			| ifStmt { $statement.st = $ifStmt.st; } 
+			| cifStmt  -> template(cif={"// cif statement\n"}) "<cif>" 
+			| parStmt  { $statement.st =  $parStmt.st; }
+			| succStmt  -> template(succ={"// succ statement\n"}) "<succ>" 
+			| block  { $statement.st = $block.st; }
+			| simpleStatement { $statement.st = $simpleStatement.st; };
 
 simpleStatement 
-		: varDecStmt -> template(varDec={" varDec "}) "<varDec>"
-			| channelDecStmt2 -> template(chanDec={" chanDec "}) "<chanDec>"
-			| sendStmt -> template(send={" send "}) "<send>"
-			| receiveStmt -> template(receive={" receive "}) "<receive>"
-			| assignStmt -> template(assign={$assignStmt.st}) "<assign>"
-			| returnStmt -> template(return={" return "}) "<return>"
-			| call -> template(call={" call proc() "}) "<call>";
+		: varDecStmt { $simpleStatement.st = $varDecStmt.st; }
+			| channelDecStmt2 -> template(chanDec={"// chanDecStmt2\n"}) "<chanDec>"
+			| sendStmt { $simpleStatement.st = $sendStmt.st; }
+			| receiveStmt { $simpleStatement.st = $receiveStmt.st; }
+			| assignStmt { $simpleStatement.st = $assignStmt.st; }
+			| returnStmt -> template(return={"// return statement\n"}) "<return>"
+			| call -> template(call={"// call statement\n"}) "<call>";
 
 block 		: ^(BLOCK statements+=statement+) -> template(statements={$statements}) "<statements>";
 
 whileStmt 	: ^('while' exp statement) -> whileStatement(condition={$exp.st}, statements={$statement.st});
 
-ifStmt		: ^('if' exp statement);
+ifStmt		: ^('if' exp statement) -> ifStatement(condition={$exp.st}, statements={$statement.st});
 
 cifStmt 	: ^('cif' ID statement);
 
@@ -269,25 +272,48 @@ succStmt	: ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
-varDecStmt 	: ^(VARDEC storageClass typeId name=ID varInit);
+varDecStmt 	: ^(VARDEC storageClass typeId name=ID varInit[$name.text]) { $varDecStmt.st = $varInit.st; };
 
-varInit		: '=' exp | NO_INIT;
+varInit		[String name]
+		: '=' exp -> assignmentStatement(target={$name},
+						 targetCleanup={"// targetCleanup"},
+						 source={$exp.st},
+						 sourceCleanup={"// sourceCleanup"})
+			| NO_INIT {$varInit.st = new StringTemplate();};
 
-sendStmt 	: ^('!' ID exp) { $procDec::hasIo = true; };
+sendStmt 	@after
+  		{
+  			$procDec::labelNum++;
+  		}
+		: ^('!' ID exp) { $procDec::hasIo = true; } 
+			-> sendStatement(procType={$procDec::type.getEmittedType()}, 
+			                 chanw={$ID.text}, 
+			                 source={$exp.st}, 
+			                 labelNum={$procDec::labelNum}, 
+			                 sourceCleanup={"// source cleanup"});
 
-receiveStmt	: ^('?' from=ID target=ID) { $procDec::hasIo = true; };
+receiveStmt	@after
+  		{
+  			$procDec::labelNum++;
+  		}
+  		: ^('?' from=ID target=ID) { $procDec::hasIo = true; }
+			-> receiveStatement(procType={$procDec::type.getEmittedType()}, 
+			                    chanr={$from.text}, 
+			                    target={$target.text}, 
+			                    labelNum={$procDec::labelNum}, 
+			                    targetCleanup={"// targetCleanup"});
 
 assignStmt 	: ^('=' ID exp) -> assignmentStatement(target={$ID.text}, 
-						               targetCleanup={""},
-						               source={$exp.st},
-						               sourceCleanup={""});
+					               targetCleanup={"// targetCleanup"},
+					               source={$exp.st},
+					               sourceCleanup={"// sourceCleanup"});
 
 returnStmt	: ^('return' exp);
 
 
-exp	 	: literal -> template(literal={$literal.st}) "<literal>"
+exp	 	: literal { $exp.st = $literal.st; }
 		| ID  -> template(id={$ID.text}) "locals-><id>"
-		| constructor -> template(construct={" constructor "}) "<construct>"
+		| constructor -> template(construct={"// constructor\n"}) "<construct>"
 		| call  { $exp.st = $call.st; }
 		| ^('<' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<"})
 		| ^('>' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">"})
@@ -316,7 +342,7 @@ pool		: 'static' | 'local' | ID;
 
 constructor	: ^(CONSTRUCTOR pool typeId argList);
 		
-call		: ^(CALL ID argList) -> template(call={" call "}) "<call>";
+call		: ^(CALL ID argList) -> template(call={"// call\n"}) "<call>";
 
 argList 	: ^(ARGLIST exp+)
 		| ^(ARGLIST NO_ARG);

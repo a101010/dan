@@ -252,11 +252,11 @@ default:
 >>
 
 sendStatement(procType, chanw, source, labelNum, sourceCleanup) ::= <<
-result = locals-><chanw>->write( locals-><chanw>->channel, locals-><source>, (void **) &ap->exception, ap, s);
+result = locals-><chanw>->write( locals-><chanw>->channel, <source>, (void **) &ap->exception, ap, s);
 switch(result)
 {
 case 0 : // wrote value
-    printf("<procType>: wrote <source> to <chanw>\n", locals-><source>);
+    printf("<procType>: wrote <source> to <chanw>\n", <source>);
     break;
 case 1 : // blocked
     saveState(ap->state, <procType>_S<labelNum>);
@@ -266,7 +266,7 @@ case 1 : // blocked
     switch(result)
     {
     case 0 : // wrote value
-        printf("<procType>: wrote <source> to <chanw>\n", locals-><source>);
+        printf("<procType>: wrote <source> to <chanw>\n", <source>);
         break;
     case 1 : // blocked
         goto EXIT;
