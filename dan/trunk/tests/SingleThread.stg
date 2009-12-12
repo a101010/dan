@@ -228,6 +228,7 @@ while ( <condition> )
 >>
 
 receiveStatement(procType, chanr, target, labelNum, targetCleanup) ::= <<
+// receive statement
 <targetCleanup>
 saveState(ap->state, <procType>_S<labelNum>);
 <target> = locals-><chanr>->read( locals-><chanr>->channel, &(locals-><target>), &ap->exception, ap, s);
@@ -252,6 +253,7 @@ default:
 >>
 
 sendStatement(procType, chanw, source, labelNum, sourceCleanup) ::= <<
+// send statement
 result = locals-><chanw>->write( locals-><chanw>->channel, <source>, (void **) &ap->exception, ap, s);
 switch(result)
 {
@@ -321,8 +323,38 @@ functionCall(function, args) ::= <<
 <function>(<args; separator=", ">)
 >>
 
-parStatement() ::= <<
+parStatement(procType, constructors, labelNum, checkTerms, numProcs, checkCleanExit) ::= <<
+// par statement
+<constructors>
 
+saveState(p->state, <procType>_S<labelNum>);
+
+<checkTerms>
+
+if(exception > 0)
+{
+    printf("<procType>: exceptions from %d processes, retiring the other processes in the par\n", exception);
+    // TODO what is the best way to clean up all the processes?
+}
+
+if(finished == <numProcs>)
+{
+    if(<checkCleanExit>)
+    {
+        p->state = _PS_EXCEPTION_;
+        printf("<procType>: all procs exited PAR, but not all cleanly\n");
+        goto EXIT;
+    }
+    else
+    {
+        printf("<procType>: PAR exiting cleanly\n");
+    }
+}
+else
+{
+    goto EXIT;
+}
+// end of par statement
 >>
 
 typeId(id) ::= <<

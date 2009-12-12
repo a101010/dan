@@ -266,7 +266,13 @@ ifStmt		: ^('if' exp statement) -> ifStatement(condition={$exp.st}, statements={
 
 cifStmt 	: ^('cif' ID statement);
 
-parStmt		: ^('par' block) { $procDec::hasPar = true;} ;
+parStmt		: ^('par' block) { $procDec::hasPar = true;} 
+			-> parStatement(procType={$procDec::type.getEmittedType()}, 
+					constructors={"// proc constuctors and schedule calls"}, 
+					lablelNum={$procDec::labelNum}, 
+					checkTerms={"// check that procs exited"}, 
+					numProcs={"<number of procs>"}, 
+					checkCleanExit={"<check that procs exited cleanly>"});
 
 succStmt	: ^('succ' block);
 
