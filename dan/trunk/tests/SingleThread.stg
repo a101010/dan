@@ -211,7 +211,7 @@ else if ( <condition> )
 
 >>
 
-elseStatement(condition, statements) ::= <<
+elseStatement(statements) ::= <<
 else
 {
     <statments>
@@ -220,7 +220,7 @@ else
 >>
 
 whileStatement(condition, statements) ::= <<
-while (<condition>)
+while ( <condition> )
 {
     <statements>
 }
