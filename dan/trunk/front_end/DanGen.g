@@ -168,7 +168,7 @@ procDec 	scope
 			$procDec::hasPar = false;
 			$procDec::labelNum = 0;
 		}
-		: ^('proc' returnType=ID name=ID { $procDec::type = (ProcType) types.get($name.text); } paramList block) 
+		: ^('proc' returnType=ID name=ID { $procDec::type = (ProcType) types.get($name.text); } paramList block[false]) 
 		{
 			ProcType type = $procDec::type;
 			ArrayList<StringTemplate> scratchInit = new ArrayList<StringTemplate>(3);
@@ -197,6 +197,7 @@ procDec 	scope
 										             .put("name", v.EmittedName)));
                         	}
                         }
+                        
                         
                         
                         retval.st = templateLib.getInstanceOf("procDec",
@@ -241,12 +242,14 @@ param 		: ^(PARAM paramStorageClass typeId name=ID)
 			retval.st = paramTemplate;*/
 		} -> param(type={$typeId.st}, name={$name});
 
+
+// TODO any statement can be launched as an anonymous proc in a par
 statement 	: whileStmt { $statement.st = $whileStmt.st; }
 			| ifStmt { $statement.st = $ifStmt.st; } 
 			| cifStmt  -> template(cif={"// cif statement\n"}) "<cif>" 
 			| parStmt  { $statement.st =  $parStmt.st; }
 			| succStmt  -> template(succ={"// succ statement\n"}) "<succ>" 
-			| block  { $statement.st = $block.st; }
+			| block[false]  { $statement.st = $block.st; }
 			| simpleStatement { $statement.st = $simpleStatement.st; };
 
 simpleStatement 
@@ -256,25 +259,61 @@ simpleStatement
 			| receiveStmt { $simpleStatement.st = $receiveStmt.st; }
 			| assignStmt { $simpleStatement.st = $assignStmt.st; }
 			| returnStmt -> template(return={"// return statement\n"}) "<return>"
-			| call -> template(call={"// call statement\n"}) "<call>";
+			| call[true] { $simpleStatement.st = $call.st; };
 
-block 		: ^(BLOCK statements+=statement+) -> template(statements={$statements}) "<statements>";
+block 		[boolean isPar]
+		scope
+		{
+			boolean isInPar;
+		}
+		@init 
+		{
+			$block::isInPar = false;
+		}
+		: ^(BLOCK  
+		{ 
+			if($block::isInPar) {
+				// TODO for this case the block is a statement in the par's block (as opposed to the par's block or a 
+				// nested block) and needs to be launched as a proc
+				// not currently supported
+			}
+			$block::isInPar = $isPar; /* so the scope variable is only true for the par's block, not nested blocks */ 
+		} statements+=statement+) -> template(statements={$statements}) "<statements>";
 
-whileStmt 	: ^('while' exp statement) -> whileStatement(condition={$exp.st}, statements={$statement.st});
+whileStmt 	: ^('while' exp block[false]) -> whileStatement(condition={$exp.st}, statements={$block.st});
 
-ifStmt		: ^('if' exp statement) -> ifStatement(condition={$exp.st}, statements={$statement.st});
+ifStmt		: ^('if' exp block[false]) -> ifStatement(condition={$exp.st}, statements={$block.st});
 
-cifStmt 	: ^('cif' ID statement);
+cifStmt 	: ^('cif' ID block[false]);
 
-parStmt		: ^('par' block) { $procDec::hasPar = true;} 
-			-> parStatement(procType={$procDec::type.getEmittedType()}, 
-					constructors={"// proc constuctors and schedule calls"}, 
-					lablelNum={$procDec::labelNum}, 
-					checkTerms={"// check that procs exited"}, 
-					numProcs={"<number of procs>"}, 
-					checkCleanExit={"<check that procs exited cleanly>"});
+parStmt		scope
+		{
+			int numProcs;
+			ArrayList<StringTemplate> procConstructors;
+			ArrayList<StringTemplate> procExitChecks;
+			ArrayList<StringTemplate> cleanExits;
+		}
+		@init
+		{
+			$parStmt::numProcs = 0;
+			$parStmt::procConstructors = new ArrayList<StringTemplate>();
+			$parStmt::procExitChecks = new ArrayList<StringTemplate>();
+			$parStmt::cleanExits = new ArrayList<StringTemplate>();
+		}
+		: ^('par' block[true]) 
+		{ 
+			$procDec::hasPar = true;
+			retval.st = templateLib.getInstanceOf("parStatement",
+					new STAttrMap().put("procType", $procDec::type.getEmittedType())
+					               .put("constructors", $parStmt::procConstructors)
+					               .put("labelNum", $procDec::labelNum)
+					               .put("exitChecks", $parStmt::procExitChecks)
+					               .put("numProcs", $parStmt::numProcs)
+					               .put("checkCleanExit", $parStmt::cleanExits)
+					               );
+		};
 
-succStmt	: ^('succ' block);
+succStmt	: ^('succ' block[false]);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
@@ -320,7 +359,7 @@ returnStmt	: ^('return' exp);
 exp	 	: literal { $exp.st = $literal.st; }
 		| ID  -> template(id={$ID.text}) "locals-><id>"
 		| constructor -> template(construct={"// constructor\n"}) "<construct>"
-		| call  { $exp.st = $call.st; }
+		| call[false]  { $exp.st = $call.st; }
 		| ^('<' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<"})
 		| ^('>' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">"})
 		| ^('<=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<="})
@@ -348,10 +387,47 @@ pool		: 'static' | 'local' | ID;
 
 constructor	: ^(CONSTRUCTOR pool typeId argList);
 		
-call		: ^(CALL ID argList) -> template(call={"// call\n"}) "<call>";
+call		[boolean isStatement]
+		: ^(CALL ID argList)
+		{
+			if(isStatement){
+				if($block::isInPar){
+					StringTemplate procConstructor = templateLib.getInstanceOf("procConstructor",
+						new STAttrMap().put("procType", $procDec::type.getEmittedType())
+						               .put("suffix", "") // TODO autogen next suffix and correlate with locals name (Note: only need a suffix if appears more than once in the par unless nezting causes other needs)
+						               .put("args", $argList.st)
+						               ); 
+					$parStmt::procConstructors.add(procConstructor);
+					
+					StringTemplate procExitCheck = templateLib.getInstanceOf("procExitCheck",
+						new STAttrMap().put("callerType", $procDec::type.getEmittedType())
+						               .put("procType", $ID.text)
+						               .put("suffix", "") // TODO compute suffix
+						               );
+					$parStmt::procExitChecks.add(procExitCheck);
+					
+					
+					StringTemplate cleanExitCheck = templateLib.getInstanceOf("procCleanExitCheck",
+						new STAttrMap().put("procType", $ID.text)
+						               .put("suffix", "") // TODO compute suffix
+						               );
+					$parStmt::cleanExits.add(cleanExitCheck);
+					
+					
+					$parStmt::numProcs++;
+				}
+				else{
+					throw new  RuntimeException($ID.text + ": call outside par not implemented yet");
+				}
+			}
+			else{
+				throw new RuntimeException($ID.text + ": call in expression not implemented yet");
+			}
+		};
 
-argList 	: ^(ARGLIST exp+)
-		| ^(ARGLIST NO_ARG);
+argList 	: ^(ARGLIST args+=exp+) -> template(args={$args}) "<args>"
+		| ^(ARGLIST NO_ARG) { $argList.st = new StringTemplate("");
+					throw new RuntimeException($procDec::type.getEmittedType() + "no arg call not implemented"); }; // TODO this case is not properly handled in the procConstructor template
 
 literal 	: 'true' { $literal.st = new StringTemplate("1"); } 
 			| 'false' { $literal.st = new StringTemplate("0"); } 

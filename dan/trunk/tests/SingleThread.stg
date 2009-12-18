@@ -117,6 +117,8 @@ typedef struct <procType>_proc_tag
     <params; separator=", ">)
 {
   <initLocals>
+  
+  return locals;
 }
 
 void <procType>_body(proc * ap, scheduler * s)
@@ -323,13 +325,14 @@ functionCall(function, args) ::= <<
 <function>(<args; separator=", ">)
 >>
 
-parStatement(procType, constructors, labelNum, checkTerms, numProcs, checkCleanExit) ::= <<
+parStatement(procType, constructors, labelNum, exitChecks, numProcs, checkCleanExit) ::= <<
+
 // par statement
 <constructors>
 
 saveState(p->state, <procType>_S<labelNum>);
 
-<checkTerms>
+<exitChecks>
 
 if(exception > 0)
 {
@@ -339,7 +342,7 @@ if(exception > 0)
 
 if(finished == <numProcs>)
 {
-    if(<checkCleanExit>)
+    if(<checkCleanExit; separator="\n\t|| ">)
     {
         p->state = _PS_EXCEPTION_;
         printf("<procType>: all procs exited PAR, but not all cleanly\n");
@@ -355,6 +358,43 @@ else
     goto EXIT;
 }
 // end of par statement
+>>
+
+procConstructor(procType, suffix, args) ::= <<
+
+<procType>_locals_ctor( &(locals->__p<procType><suffix>.locals), <args; seperator=", ">);
+proc_ctor( (proc*) &(locals->__p<procType><suffix>), "<procType>", p, <procType>_body);
+s->schedule(s, (proc*) &(locals->__p<procType><suffix>));
+
+>>
+
+procExitCheck(callerType, procType, suffix) ::= <<
+
+lock(locals->__p<procType><suffix>.p.spinlock);
+if(locals->__p<procType><suffix>.p.sched_state == _FINISHED_)
+{
+    finished += 1;
+    if(locals->__p<procType><suffix>.p.state == _PS_EXCEPTION_)
+    {
+        exception += 1;
+        p->state = _PS_EXCEPTION_;
+        p->exception = locals->__p<procType><suffix>.p.exception;
+        printf("<callerType>: caught exception from __p<procType><suffix>\n");
+
+    }
+    else if(locals->p<procType><suffix>.p.state !=  _PS_CLEAN_EXIT_)
+    {
+        exception += 1;
+        p->state = _PS_EXCEPTION_;
+        p->exception = "<callerType>: p<procType><suffix> didn't exit cleanly, but didn't throw exception\n";
+    }
+}
+unlock(locals->pCount1.p.spinlock);
+
+>>
+
+procCleanExitCheck(procType, suffix) ::= <<
+locals->__p<procType><suffix>.p.state != _PS_CLEAN_EXIT_
 >>
 
 typeId(id) ::= <<
@@ -377,3 +417,4 @@ statementList(statements) ::= <<
 <statements; separator="\n">
 
 >>
+
