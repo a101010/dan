@@ -364,15 +364,16 @@ block
 			}
 		} -> ^(BLOCK statement+);
 
-whileStmt 	: 'while' '(' exp ')' statement
-			-> ^('while' exp statement);
+whileStmt 	: 'while' '(' exp ')' block
+			-> ^('while' exp block);
 
-ifStmt		: 'if' '(' exp ')' statement
-			-> ^('if' exp statement);
+ifStmt		: 'if' '(' exp ')' block
+			-> ^('if' exp block);
 
-cifStmt 	: 'cif' '(' ID ')' statement
-			-> ^('cif' ID statement);
+cifStmt 	: 'cif' '(' ID ')' block
+			-> ^('cif' ID block);
 
+// TODO may want to prohibit one-level nested pars
 parStmt	: 'par' block -> ^('par' block);
 
 succStmt	: 'succ' block -> ^('succ' block);
