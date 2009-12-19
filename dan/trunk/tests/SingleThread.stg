@@ -92,6 +92,10 @@ channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
 
 >>
 
+instanceParam(procType) ::= <<
+<procType>_locals * locals
+>>
+
 procDec(procType,
         locals,
         params,
@@ -113,8 +117,7 @@ typedef struct <procType>_proc_tag
 } <procType>_proc;
 
 // <procType>_locals constructor
-<procType>_locals * <procType>_locals_ctor(<procType>_locals * locals,
-    <params; separator=", ">)
+<procType>_locals * <procType>_locals_ctor(<params; separator=", ">)
 {
   <initLocals>
   
