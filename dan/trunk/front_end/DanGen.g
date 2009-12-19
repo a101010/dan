@@ -144,7 +144,6 @@ procDec 	scope
 		{
 			ProcType type;
 			ArrayList<StringTemplate> locals;
-			ArrayList<StringTemplate> params;
 			ArrayList<StringTemplate> initLocals;
 			ArrayList<StringTemplate> cleanup;
 			ArrayList<StringTemplate> scratchInit;
@@ -163,12 +162,16 @@ procDec 	scope
 			// Would be nice if cleanup occurs on last use, rather than 
 			// at the end of the proc
 			$procDec::cleanup = new ArrayList<StringTemplate>();
+			$procDec::initLocals = new ArrayList<StringTemplate>();
 			$procDec::scratchInit = new ArrayList<StringTemplate>();
 			$procDec::hasIo = false;
 			$procDec::hasPar = false;
 			$procDec::labelNum = 0;
 		}
-		: ^('proc' returnType=ID name=ID { $procDec::type = (ProcType) types.get($name.text); } paramList block[false]) 
+		: ^('proc' returnType=ID name=ID 
+		{ 
+			$procDec::type = (ProcType) types.get($name.text); 
+		} paramList block[false]) 
 		{
 			ProcType type = $procDec::type;
 			ArrayList<StringTemplate> scratchInit = new ArrayList<StringTemplate>(3);
@@ -183,7 +186,9 @@ procDec 	scope
 	                        scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
 	                        	new STAttrMap().put("scratchInit", "int exceptions = 0; // for the number of procs in a par that threw exceptions\n")));                        	
                         }
+                        
                         ArrayList<StringTemplate> locals = new ArrayList<StringTemplate>(type.Locals.size());
+                        
                         
                         for(Vardec v: type.Locals.values()){
                         	if(v.isByRef()){
@@ -198,13 +203,30 @@ procDec 	scope
                         	}
                         }
                         
+                        ArrayList<StringTemplate> params = new ArrayList<StringTemplate>(type.Params.size());
                         
+                        StringTemplate instanceParam = templateLib.getInstanceOf("instanceParam",
+					new STAttrMap().put("procType", $name));
+			params.add(instanceParam);
+                        
+                        for(Vardec v: type.Params){
+                        if(v.isByRef()){
+                        		params.add( templateLib.getInstanceOf("refParam",
+									      new STAttrMap().put("type", v.getEmittedType())
+									                     .put("name", v.EmittedName)));
+                        	}
+                        	else {
+                        		params.add( templateLib.getInstanceOf("valueParam",
+								              new STAttrMap().put("type", v.getEmittedType())
+										             .put("name", v.EmittedName)));
+                        	}
+                        }
                         
                         retval.st = templateLib.getInstanceOf("procDec",
 					new STAttrMap().put("procType", $name)
 					               .put("locals", locals)
-					               .put("params", $paramList.st)
-					               .put("initLocals", "// initLocals")
+					               .put("params", params)
+					               .put("initLocals", $procDec::initLocals)
 					               .put("procBodyScratchInit", scratchInit)
 					               .put("statements", $block.st)
 					               .put("cleanup", "// cleanup")
@@ -230,6 +252,12 @@ paramStorageClass
 
 param 		: ^(PARAM paramStorageClass typeId name=ID) 
 		{
+			StringTemplate initLocal = templateLib.getInstanceOf("initLocal",
+					new STAttrMap().put("name", $name)
+					               .put("value", $name)
+					               );
+			$procDec::initLocals.add(initLocal);
+			
 			/*StringTemplate paramTemplate;
 			DanType paramType = types.get($typeId.text);
 			if(paramType.isByRef()){
