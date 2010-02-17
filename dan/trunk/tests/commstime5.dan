@@ -8,85 +8,85 @@ import GetTimeNano from Time;
 
 proc void Delta(static chanr<int32> in, static chanw<int32> out1, static chanw<int32> out2)
 {
-	int32 value;
-	while (true)
-	{		
-		in ? value;
-		out1 ! value;
-		out2 ! value;
-	}
+    int32 value;
+    while (true)
+    {        
+        in ? value;
+        out1 ! value;
+        out2 ! value;
+    }
 }
-			
+            
 proc void Succ(static chanr<int32> in, static chanw<int32> out)
 {
-	int32 value;
-	while (true)
-	{
-		in ? value;
-		out ! value + 1;
-	}
+    int32 value;
+    while (true)
+    {
+        in ? value;
+        out ! value + 1;
+    }
 }
-		
+        
 proc void Prefix(static chanr<int32> in, static chanw<int32> out, int32 initValue)
 {
-	int32 value = initValue;
-	out ! value;
-	while (true)
-	{
-		in ? value;
-		out ! value;
-	}
+    int32 value = initValue;
+    out ! value;
+    while (true)
+    {
+        in ? value;
+        out ! value;
+    }
 }
 
 proc void Count(static chanr<int32> in)
 {
-	int32 value;
-	int32 step = 100000;
-//	cif(debug)
-//	{
-//		int32 time; // in nanoseconds
-//	}
-	while (true)
-	{
-		int32 i = 0;
-//		cif(debug)
-//		{
-//			time = GetTimeNano();
-//		}
-		while (i < step)
-		{
-			in ? value;
-			i = i + 1;
-		}
-//		cif(debug)
-//		{
-//			time = GetTimeNano() - time;
-//			debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
-//			debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
-//		}
-	}
+    int32 value;
+    int32 step = 100000;
+//    cif(debug)
+//    {
+//        int32 time; // in nanoseconds
+//    }
+    while (true)
+    {
+        int32 i = 0;
+//        cif(debug)
+//        {
+//            time = GetTimeNano();
+//        }
+        while (i < step)
+        {
+            in ? value;
+            i = i + 1;
+        }
+//        cif(debug)
+//        {
+//            time = GetTimeNano() - time;
+//            debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
+//            debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
+//        }
+    }
 }
-		
-		
+        
+        
 [main]
 proc void Commstime()
 {
     // Statically allocated channels are allocated in the locals
     // space of the proc.
-	static channel<int32>(0) a;
-	static channel<int32>(0) b;
-	static channel<int32>(0) c;
-	static channel<int32>(0) d;
-	par
-	{
+    static channel<int32>(0) a;
+    static channel<int32>(0) b;
+    static channel<int32>(0) c;
+    static channel<int32>(0) d;
+    par
+    {
         // For static channels, channel ends may only be passed to procs that are
         // gauranteed to complete before the allocating proc.
         // This means they must be in a par, and must declare
         // the channel end static in their parameter list.
         // (These rules will also apply to statically allocated Mobile types)
-		Prefix(d.Read, a.Write);
-		Delta(a.Read, b.Write, c.Write);
-		Succ(c.Read, d.Write);
-		Count(b.Read);
-	}
-}		
+        Prefix(d.Read, a.Write);
+        Delta(a.Read, b.Write, c.Write);
+        Succ(c.Read, d.Write);
+        Count(b.Read);
+    }
+}        
