@@ -10,83 +10,83 @@ import GetTimeNano from Time;
 
 bundle BInt
 {
-	channel<int32>(0) c ->;
-	// eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
+    channel<int32>(0) c ->;
+    // eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
 }
 
 proc void Delta(static BInt.Read in, static BInt.Write out1, static BInt.Write out2)
 {
-	int32 value;
-	while (true)
-	{		
-		in.c ? value;
-		out1.c ! value;
-		out2.c ! value;
-	}
+    int32 value;
+    while (true)
+    {        
+        in.c ? value;
+        out1.c ! value;
+        out2.c ! value;
+    }
 }
-			
+            
 proc void Succ(static BInt.Read in, static BInt.Write out)
 {
-	int32 value;
-	while (true)
-	{
-		in.c ? value;
-		out.c ! value + 1;
-	}
+    int32 value;
+    while (true)
+    {
+        in.c ? value;
+        out.c ! value + 1;
+    }
 }
-		
+        
 proc void Prefix(static BInt.Read in, static BInt.Write out, int32 initValue)
 {
-	int32 value = initValue;
-	out.c ! value;
-	while (true)
-	{
-		in.c ? value;
-		out.c ! value;
-	}
+    int32 value = initValue;
+    out.c ! value;
+    while (true)
+    {
+        in.c ? value;
+        out.c ! value;
+    }
 }
 
 proc void Count(static BInt.Read in)
 {
-	int32 value;
-	int32 step = 100000;
-//	cif(debug)
-//	{
-//		int32 time; // in nanoseconds
-//	}
-	while (true)
-	{
-		int32 i = 0;
-//		cif(debug)
-//		{
-//			time = GetTimeNano();
-//		}
-		while (i < step)
-		{
-			in.c ? value;
-			i = i + 1;
-		}
-//		cif(debug)
-//		{
-//			time = GetTimeNano() - time;
-//			debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
-//			debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
-//		}
-	}
+    int32 value;
+    int32 step = 100000;
+//    cif(debug)
+//    {
+//        int32 time; // in nanoseconds
+//    }
+    while (true)
+    {
+        int32 i = 0;
+//        cif(debug)
+//        {
+//            time = GetTimeNano();
+//        }
+        while (i < step)
+        {
+            in.c ? value;
+            i = i + 1;
+        }
+//        cif(debug)
+//        {
+//            time = GetTimeNano() - time;
+//            debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
+//            debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
+//        }
+    }
 }
-		
-		
+        
+        
 [main]
 proc void Commstime()
 {
     // Statically allocated bundles are allocated in the locals
     // space of the proc.
-	static BInt a = new(static) BInt();
-	static BInt b = new(static) BInt();
-	static BInt c = new(static) BInt();
-	static BInt d = new(static) BInt();
-	par
-	{
+    static BInt a = new(static) BInt();
+    static BInt b = new(static) BInt();
+    static BInt c = new(static) BInt();
+    static BInt d = new(static) BInt();
+    par
+    {
         // For static bundles, the entire bundle end must be
         // passed to other processes.  Individual channels may not
         // be passed separately.
@@ -95,9 +95,9 @@ proc void Commstime()
         // This means they must be in a par, and must declare
         // the bundle end static in their parameter list.
         // (These rules will also apply to statically allocated Mobile types)
-		Prefix(d.Read, a.Write);
-		Delta(a.Read, b.Write, c.Write);
-		Succ(c.Read, d.Write);
-		Count(b.Read);
-	}
-}		
+        Prefix(d.Read, a.Write);
+        Delta(a.Read, b.Write, c.Write);
+        Succ(c.Read, d.Write);
+        Count(b.Read);
+    }
+}        
