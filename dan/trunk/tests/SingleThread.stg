@@ -236,7 +236,7 @@ receiveStatement(procType, chanr, target, labelNum, targetCleanup) ::= <<
 // receive statement
 <targetCleanup>
 saveState(ap->state, <procType>_S<labelNum>);
-<target> = locals-><chanr>->read( locals-><chanr>->channel, &(locals-><target>), &ap->exception, ap, s);
+result = locals-><chanr>->read( locals-><chanr>->channel, &(locals-><target>), &ap->exception, ap, s);
 switch(result)
 {
 case 0 : // read value
@@ -421,3 +421,28 @@ statementList(statements) ::= <<
 
 >>
 
+constructorStaticNoArgs(type, value) ::= <<
+// constructorStaticNoArgs
+<type>_ctor( &(locals-><value>) );
+
+>>
+
+constructorStaticWiArgs(type, value, args) ::= <<
+// constructorStaticWiArgs
+<type>_ctor( &(locals-><value>), <args> );
+
+>>
+
+constructorDynamicNoArgs(type, pool, size) ::= <<
+// constructorDynamicNoArgs
+value = <pool>->malloc(<size>);
+<type>_ctor( &value );
+
+>>
+
+constructorDynamicWiArgs(type, pool, size) ::= <<
+// constructorDynamicWiArgs
+value = <pool>->malloc(<size>);
+<type>_ctor( &value, <args> );
+
+>>
