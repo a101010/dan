@@ -1,5 +1,5 @@
 // A tree grammar for the Dangerous Language's dan compiler
-// Copyright 2009, Alan Grover, all rights reserved
+// Copyright 2010, Alan Grover, all rights reserved
 
 tree grammar DanGen;
 
@@ -20,7 +20,10 @@ import dan.system.*;
 @members 
 {
 public HashMap<String, DanType> types;
-	
+
+// for assignment statements and vardec statements with an initializer, 
+// represents the target of the assignment
+public String assignTarget = null;
 }
 
 prog		: imports decs -> danModule(frontMatter={"// TODO frontmatter"},
@@ -345,14 +348,42 @@ succStmt	: ^('succ' block[false]);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
-varDecStmt 	: ^(VARDEC storageClass typeId name=ID varInit[$name.text]) { $varDecStmt.st = $varInit.st; };
+varDecStmt 	: ^(VARDEC storageClass typeId name=ID { assignTarget = $name.text; } varInit[$name.text]) 
+		{ 
+			$varDecStmt.st = $varInit.st; 
+		};
 
 varInit		[String name]
-		: '=' exp -> assignmentStatement(target={$name},
-						 targetCleanup={"// targetCleanup"},
-						 source={$exp.st},
-						 sourceCleanup={"// sourceCleanup"})
-			| NO_INIT {$varInit.st = new StringTemplate();};
+		: '=' exp 
+		{
+			// TODO this is a genuine bona fide hack (yick!)
+			// we hard code a template element to check if the first expression was a constructor
+			// allows supporting the limited first case of constructors to get the first demos going
+			// eventually this problem must be solved more generally
+			// TODO also need to modify assignStmt
+			if($exp.st.toString().startsWith("// constructorStatic")){
+				$varInit.st = $exp.st;
+			} else if($exp.st.toString().startsWith("// constructorDynamic")){
+				throw new RuntimeException("constructors on dynamic memory pools are not supported");
+			} else {
+				$varInit.st = templateLib.getInstanceOf("assignmentStatement",
+				new STAttrMap().put("target", name)
+					       .put("targetCleanup", "// targetCleanup")
+					       .put("source", $exp.st)
+					       .put("sourceCleanup", "// sourceCleanup"));
+			}
+			
+			
+		 //-> assignmentStatement(target={$name},
+		 //				 targetCleanup={"// targetCleanup"},
+		 //				 source={$exp.st},
+		 //				 sourceCleanup={"// sourceCleanup"})
+		}
+		| NO_INIT 
+		{
+			// TODO eventually this should probably be a default initializer
+			$varInit.st = new StringTemplate();
+		};
 
 sendStmt 	@after
   		{
@@ -376,17 +407,23 @@ receiveStmt	@after
 			                    labelNum={$procDec::labelNum}, 
 			                    targetCleanup={"// targetCleanup"});
 
-assignStmt 	: ^('=' ID exp) -> assignmentStatement(target={$ID.text}, 
-					               targetCleanup={"// targetCleanup"},
-					               source={$exp.st},
-					               sourceCleanup={"// sourceCleanup"});
+assignStmt 	: ^('=' ID { assignTarget = $ID.text; } exp)
+		{
+			
+			$assignStmt.st = templateLib.getInstanceOf("assignmentStatement",
+				new STAttrMap().put("target", $ID.text)
+					       .put("targetCleanup", "// targetCleanup")
+					       .put("source", $exp.st)
+					       .put("sourceCleanup", "// sourceCleanup"));
+			
+		};
 
 returnStmt	: ^('return' exp);
 
 
 exp	 	: literal { $exp.st = $literal.st; }
 		| ID  -> template(id={$ID.text}) "locals-><id>"
-		| constructor -> template(construct={"// constructor\n"}) "<construct>"
+		| constructor -> { $exp.st = $constructor.st; }
 		| call[false]  { $exp.st = $call.st; }
 		| ^('<' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<"})
 		| ^('>' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">"})
@@ -411,12 +448,45 @@ exp	 	: literal { $exp.st = $literal.st; }
 // Really would like templates that can support various asm flavors, but will leave that for a future effort.		
 
 
-pool		: 'static' | 'local' | ID;
+pool		returns [String poolName] 
+		: 'static' { $poolName = "static"; }
+		| 'local'  { $poolName = "local"; }
+		| ID       { $poolName = $ID.text; };
 
-constructor	: ^(CONSTRUCTOR pool typeId argList);
+constructor	: ^(CONSTRUCTOR pool typeId argList[true]) 
+		{
+			System.out.println("made it");
+			// TODO need to deal with constructors in arbitrary expressions, not just as
+			// the sole expression of an assignStmt or varDecStmt
+			//String poolStr = $pool.st.toString();
+			String typeIdStr = $typeId.st.toString();
+			DanType type = types.get(typeIdStr.toString());
+			if(type == null){
+				throw new RuntimeException("no type information for type: " + typeIdStr);
+			}
+			if($pool.poolName.equals("static")){
+				// no args
+				if($argList.st.toString().length() == 0){
+					$constructor.st = templateLib.getInstanceOf("constructorStaticNoArgs",
+							new STAttrMap().put("type", type.getEmittedType())
+							               .put("value", assignTarget)
+							               );
+				}
+				else {
+					$constructor.st = templateLib.getInstanceOf("constructorStaticWiArgs",
+							new STAttrMap().put("type", type.getEmittedType())
+							               .put("value", assignTarget)
+							               .put("args", $argList.st) 
+							               );
+				}
+			}
+			else {
+				throw new RuntimeException("memory pools other than 'static' are not supported");
+			}
+		};
 		
 call		[boolean isStatement]
-		: ^(CALL ID argList)
+		: ^(CALL ID argList[false])
 		{
 			if(isStatement){
 				if($block::isInPar){
@@ -453,9 +523,18 @@ call		[boolean isStatement]
 			}
 		};
 
-argList 	: ^(ARGLIST args+=exp+) -> template(args={$args}) "<args>"
-		| ^(ARGLIST NO_ARG) { $argList.st = new StringTemplate("");
-					throw new RuntimeException($procDec::type.getEmittedType() + "no arg call not implemented"); }; // TODO this case is not properly handled in the procConstructor template
+argList 	[boolean isConstructor]
+		: ^(ARGLIST args+=exp+) -> template(args={$args}) "<args>"
+		| ^(ARGLIST NO_ARG) 
+		{ 
+			if(isConstructor){
+				$argList.st = new StringTemplate("");
+			}
+			else {
+				$argList.st = new StringTemplate("");
+				throw new RuntimeException($procDec::type.getEmittedType() + ": no arg call not implemented"); 
+			}
+		}; // TODO this case is not properly handled in the procConstructor template
 
 literal 	: 'true' { $literal.st = new StringTemplate("1"); } 
 			| 'false' { $literal.st = new StringTemplate("0"); } 

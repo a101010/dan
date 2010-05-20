@@ -1,5 +1,5 @@
 // A Grammar for the Dangerous Language's dan compiler
-// Copyright 2009, Alan Grover, all rights reserved
+// Copyright 2010, Alan Grover, all rights reserved
 
 grammar DanProg;
 options {output=AST;}
