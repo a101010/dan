@@ -236,7 +236,8 @@ receiveStatement(procType, chanr, target, labelNum, targetCleanup) ::= <<
 // receive statement
 <targetCleanup>
 saveState(ap->state, <procType>_S<labelNum>);
-result = locals-><chanr>->read( locals-><chanr>->channel, &(locals-><target>), &ap->exception, ap, s);
+// TODO use the type parameter
+result = locals-><chanr>->read( locals-><chanr>->channel, &type, &(locals-><target>), &ap->exception, ap, s);
 switch(result)
 {
 case 0 : // read value
@@ -259,7 +260,8 @@ default:
 
 sendStatement(procType, chanw, source, labelNum, sourceCleanup) ::= <<
 // send statement
-result = locals-><chanw>->write( locals-><chanw>->channel, <source>, (void **) &ap->exception, ap, s);
+// TODO use the type parameter
+result = locals-><chanw>->write( locals-><chanw>->channel, 0, <source>, (void **) &ap->exception, ap, s);
 switch(result)
 {
 case 0 : // wrote value
