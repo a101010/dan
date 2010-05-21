@@ -181,7 +181,7 @@ procDec 	scope
 			
 			if($procDec::hasIo){
 				scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
-	                        	new STAttrMap().put("scratchInit", "int result = 0; // for the result of read and write ops\n")));
+	                        	new STAttrMap().put("scratchInit", "int result = 0; // for the result of read and write ops\nType type; //TODO use the Type\n")));
                         }
                         if($procDec::hasPar){
 				scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
@@ -391,7 +391,7 @@ sendStmt 	@after
   		}
 		: ^('!' ID exp) { $procDec::hasIo = true; } 
 			-> sendStatement(procType={$procDec::type.getEmittedType()}, 
-			                 chanw={$ID.text}, 
+			                 chanw={"TODO not $ID.text, which can have '.' where we may need '->'"}, 
 			                 source={$exp.st}, 
 			                 labelNum={$procDec::labelNum}, 
 			                 sourceCleanup={"// source cleanup"});
@@ -402,8 +402,8 @@ receiveStmt	@after
   		}
   		: ^('?' from=ID target=ID) { $procDec::hasIo = true; }
 			-> receiveStatement(procType={$procDec::type.getEmittedType()}, 
-			                    chanr={$from.text}, 
-			                    target={$target.text}, 
+			                    chanr={"// TODO not $from.text, which can have '.' where we may need '->'"}, 
+			                    target={"// TODO not $target.text, which can have '.' where we may need '->'"}, 
 			                    labelNum={$procDec::labelNum}, 
 			                    targetCleanup={"// targetCleanup"});
 
