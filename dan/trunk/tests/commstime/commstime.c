@@ -639,19 +639,19 @@ void Commstime_body(proc * ap, scheduler * s)
     // par statement
 
     Prefix_locals_ctor( &(locals->__pPrefix.locals), locals->d.read, locals->a.write, 0);
-    proc_ctor( (proc*) &(locals->__pPrefix), "Prefix", p, Prefix_body);
+    proc_ctor( (proc*) &(locals->__pPrefix), "Prefix", ap, Prefix_body);
     s->schedule(s, (proc*) &(locals->__pPrefix));
 
     Delta_locals_ctor( &(locals->__pDelta.locals), locals->a.read, locals->b.write, locals->c.write);
-    proc_ctor( (proc*) &(locals->__pDelta), "Delta", p, Delta_body);
+    proc_ctor( (proc*) &(locals->__pDelta), "Delta", ap, Delta_body);
     s->schedule(s, (proc*) &(locals->__pDelta));
 
     Succ_locals_ctor( &(locals->__pSucc.locals), locals->c.read, locals->d.write);
-    proc_ctor( (proc*) &(locals->__pSucc), "Succ", p, Succ_body);
+    proc_ctor( (proc*) &(locals->__pSucc), "Succ", ap, Succ_body);
     s->schedule(s, (proc*) &(locals->__pSucc));
 
     Count_locals_ctor( &(locals->__pCount.locals), locals->b.read);
-    proc_ctor( (proc*) &(locals->__pCount), "Count", p, Count_body);
+    proc_ctor( (proc*) &(locals->__pCount), "Count", ap, Count_body);
     s->schedule(s, (proc*) &(locals->__pCount));
 
 
@@ -743,9 +743,9 @@ void Commstime_body(proc * ap, scheduler * s)
     unlock(locals->pCount1.p.spinlock);
 
 
-    if(exception > 0)
+    if(exceptions > 0)
     {
-        printf("Commstime_proc: exceptions from %d processes, retiring the other processes in the par\n", exception);
+        printf("Commstime_proc: exceptions from %d processes, retiring the other processes in the par\n", exceptions);
         // TODO what is the best way to clean up all the processes?
     }
 
