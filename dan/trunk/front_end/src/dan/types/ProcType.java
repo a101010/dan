@@ -30,6 +30,8 @@ public class ProcType extends DanType {
         if(t.getText().contains("."))
             throw new TypeException(t, "Proc type names may not contain '.'");
     }
+    // TODO eventually attributes may be more complicated that strings
+    public final ArrayList<String> Attributes;
     public final ArrayList<Vardec> Params;
     public final TypeRef ReturnType;
     public final HashMap<String, Vardec> Locals; // the key is the emitted name
@@ -38,6 +40,7 @@ public class ProcType extends DanType {
     
     public ProcType(Token name, 
                     TypeRef returnType,
+                    ArrayList<String> attributes,
                     ArrayList<Vardec> params,
                     HashMap<String, Vardec> locals,
                     Scope rootScope){
@@ -47,6 +50,7 @@ public class ProcType extends DanType {
         RootScope = rootScope;
         Locals = locals;
         Params = params;
+        Attributes = attributes;
     }
 
     @Override

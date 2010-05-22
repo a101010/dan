@@ -76,6 +76,7 @@ typedef struct Bundle_<bundleType>_tag
 Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans)
 {
     <channelConstructors>
+    
     chans->read = &(chans->readStore);
     chans->write = &(chans->writeStore);
     return chans;
@@ -89,7 +90,10 @@ Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans)
 
 channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
 <chanType>_ctor( &(chans-><chanName>), <readEndId>, <writeEndId>);
-
+chans->readStore.<chanName> = chans-><chanName>.ends.read;
+chans-><chanName>.ends.read = 0; // because it is a mobile type
+chans->writeStore.<chanName> = chans-><chanName>.ends.write;
+chans-><chanName>.ends.write = 0;
 >>
 
 instanceParam(procType) ::= <<
@@ -107,7 +111,7 @@ procDec(procType,
 // <procType> PROC type
 typedef struct <procType>_locals_tag
 {
-	<locals>
+    <locals>
 } <procType>_locals;
 
 typedef struct <procType>_proc_tag
@@ -127,14 +131,14 @@ typedef struct <procType>_proc_tag
 void <procType>_body(proc * ap, scheduler * s)
 {
     <procBodyScratchInit>
-	
+    
     <procType>_proc* p = (<procType>_proc*) ap;
-	<procType>_locals* locals = &(p->locals);
+    <procType>_locals* locals = &(p->locals);
     if(ap->state != _PS_READY_TO_RUN_)
         restoreState(ap->state);
 
     <statements>
-	
+    
     ap->state = _PS_CLEAN_EXIT_;
 EXIT:
     if((ap->state == _PS_EXCEPTION_) || (ap->state == _PS_CLEAN_EXIT_) )
@@ -367,7 +371,7 @@ else
 
 procConstructor(procType, suffix, args) ::= <<
 
-<procType>_locals_ctor( &(locals->__p<procType><suffix>.locals), <args; seperator=", ">);
+<procType>_locals_ctor( &(locals->__p<procType><suffix>.locals), <args; separator=", ">);
 proc_ctor( (proc*) &(locals->__p<procType><suffix>), "<procType>", ap, <procType>_body);
 s->schedule(s, (proc*) &(locals->__p<procType><suffix>));
 
@@ -446,5 +450,42 @@ constructorDynamicWiArgs(type, pool, size) ::= <<
 // constructorDynamicWiArgs
 value = <pool>->malloc(<size>);
 <type>_ctor( &value, <args> );
+
+>>
+
+mainProc(mainProcDec, mainProcName) ::= <<
+<mainProcDec>
+
+// TODO int main(int argc, char ** argv)
+int main()
+{
+    Scheduler_default ctxt;
+    // TODO allow main proc to get argv and default channels
+    <mainProcName>_proc mainProc;
+    int ret_val = 0;
+
+    default_scheduler_ctor(&ctxt);
+
+    
+    <mainProcName>_locals_ctor(&(mainProc.locals));
+
+    
+    proc_ctor((proc*) (&mainProc), "<mainProcName>", 0, <mainProcName>_body);
+
+    ret_val = Schedule_default( &(ctxt.s), (proc*) (&mainProc)); // TODO just exit?  assert: ctxt.num_ready == 0 if ret_val != 0
+    
+
+    ret_val = default_scheduler_run(&ctxt);
+
+    if(ctxt.num_unready > 0)
+    {
+        printf("Number of deadlocked processes = %d\n", ctxt.num_unready);
+        ret_val = 1;
+    }
+
+    printf("Press \<enter\> to exit.\n");
+    getchar();
+    return ret_val;
+}
 
 >>

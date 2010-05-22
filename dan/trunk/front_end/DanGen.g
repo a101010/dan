@@ -225,7 +225,7 @@ procDec 	scope
                         	}
                         }
                         
-                        retval.st = templateLib.getInstanceOf("procDec",
+                        StringTemplate procDecTemplate = templateLib.getInstanceOf("procDec",
 					new STAttrMap().put("procType", $name)
 					               .put("locals", locals)
 					               .put("params", params)
@@ -234,6 +234,24 @@ procDec 	scope
 					               .put("statements", $block.st)
 					               .put("cleanup", "// cleanup")
 					               );
+			
+			// TODO add check for duplicate main (not here... have to check across all libraries and modules)
+			boolean isMain = false;
+			for(String s: type.Attributes){
+				if(s.equals("main")){
+					isMain = true;
+					break;
+				}
+			}
+			
+			if(isMain){
+				retval.st = templateLib.getInstanceOf("main",
+					new STAttrMap().put("mainProcDec", procDecTemplate)
+					               .put("mainProcName", type.getName())
+					               );
+			} else {
+				retval.st = procDecTemplate;
+			}
 		};
 
 paramList 	: ^(PARAMLIST rameses+=param*) -> paramList(params={$rameses});
