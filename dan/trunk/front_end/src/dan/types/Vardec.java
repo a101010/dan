@@ -29,7 +29,7 @@ public class Vardec {
         StorageClass = storageClass;
         Type = type;
         Name = name;
-        EmittedName = emittedName;
+        EmittedName = emittedName.replaceAll("\\.", "->");
         IsParam = isParam;
     }
 
