@@ -280,7 +280,7 @@ case 1 : // blocked
     case 1 : // blocked
         goto EXIT;
     case 2 : // exception
-        p->state = _PS_EXCEPTION_;
+        ap->state = _PS_EXCEPTION_;
         goto EXIT;
     default:
         printf("unexpected result from write to <chanw> in <procType>_body: %d\n", result);
@@ -335,7 +335,7 @@ parStatement(procType, constructors, labelNum, exitChecks, numProcs, checkCleanE
 // par statement
 <constructors>
 
-saveState(p->state, <procType>_S<labelNum>);
+saveState(ap->state, <procType>_S<labelNum>);
 
 <exitChecks>
 
@@ -349,7 +349,7 @@ if(finished == <numProcs>)
 {
     if(<checkCleanExit; separator="\n\t|| ">)
     {
-        p->state = _PS_EXCEPTION_;
+        ap->state = _PS_EXCEPTION_;
         printf("<procType>: all procs exited PAR, but not all cleanly\n");
         goto EXIT;
     }
@@ -381,17 +381,17 @@ if(locals->__p<procType><suffix>.p.sched_state == _FINISHED_)
     finished += 1;
     if(locals->__p<procType><suffix>.p.state == _PS_EXCEPTION_)
     {
-        exception += 1;
-        p->state = _PS_EXCEPTION_;
-        p->exception = locals->__p<procType><suffix>.p.exception;
+        exceptions += 1;
+        ap->state = _PS_EXCEPTION_;
+        ap->exception = locals->__p<procType><suffix>.p.exception;
         printf("<callerType>: caught exception from __p<procType><suffix>\n");
 
     }
-    else if(locals->p<procType><suffix>.p.state !=  _PS_CLEAN_EXIT_)
+    else if(locals->__p<procType><suffix>.p.state !=  _PS_CLEAN_EXIT_)
     {
-        exception += 1;
-        p->state = _PS_EXCEPTION_;
-        p->exception = "<callerType>: p<procType><suffix> didn't exit cleanly, but didn't throw exception\n";
+        exceptions += 1;
+        ap->state = _PS_EXCEPTION_;
+        ap->exception = "<callerType>: p<procType><suffix> didn't exit cleanly, but didn't throw exception\n";
     }
 }
 unlock(locals->pCount1.p.spinlock);

@@ -391,7 +391,7 @@ sendStmt 	@after
   		}
 		: ^('!' ID exp) { $procDec::hasIo = true; } 
 			-> sendStatement(procType={$procDec::type.getEmittedType()}, 
-			                 chanw={"TODO not $ID.text, which can have '.' where we may need '->'"}, 
+			                 chanw={$ID.text.replaceAll("\\.", "->")}, 
 			                 source={$exp.st}, 
 			                 labelNum={$procDec::labelNum}, 
 			                 sourceCleanup={"// source cleanup"});
@@ -402,8 +402,8 @@ receiveStmt	@after
   		}
   		: ^('?' from=ID target=ID) { $procDec::hasIo = true; }
 			-> receiveStatement(procType={$procDec::type.getEmittedType()}, 
-			                    chanr={"// TODO not $from.text, which can have '.' where we may need '->'"}, 
-			                    target={"// TODO not $target.text, which can have '.' where we may need '->'"}, 
+			                    chanr={$from.text.replaceAll("\\.", "->")}, 
+			                    target={$target.text.replaceAll("\\.", "->")}, 
 			                    labelNum={$procDec::labelNum}, 
 			                    targetCleanup={"// targetCleanup"});
 
@@ -491,7 +491,7 @@ call		[boolean isStatement]
 			if(isStatement){
 				if($block::isInPar){
 					StringTemplate procConstructor = templateLib.getInstanceOf("procConstructor",
-						new STAttrMap().put("procType", $procDec::type.getEmittedType())
+						new STAttrMap().put("procType", $ID.text)
 						               .put("suffix", "") // TODO autogen next suffix and correlate with locals name (Note: only need a suffix if appears more than once in the par unless nezting causes other needs)
 						               .put("args", $argList.st)
 						               ); 
@@ -524,7 +524,7 @@ call		[boolean isStatement]
 		};
 
 argList 	[boolean isConstructor]
-		: ^(ARGLIST args+=exp+) -> template(args={$args}) "<args>"
+		: ^(ARGLIST args+=exp+) -> template(args={$args}) "<args; separator=\", \">"
 		| ^(ARGLIST NO_ARG) 
 		{ 
 			if(isConstructor){
