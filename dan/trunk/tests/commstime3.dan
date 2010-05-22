@@ -54,7 +54,8 @@ proc void Count(static BInt.Read in)
 //    {
 //        int32 time; // in nanoseconds
 //    }
-    while (true)
+    int32 iteration = 0;
+    while (iteration < 3)
     {
         int32 i = 0;
 //        cif(debug)
@@ -72,6 +73,7 @@ proc void Count(static BInt.Read in)
 //            debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
 //            debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
 //        }
+        iteration = iteration + 1;
     }
 }
         

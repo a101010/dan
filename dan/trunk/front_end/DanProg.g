@@ -94,7 +94,15 @@ importStmt 	: 'import' ID STMT_END -> ^('import' ID ALL)
 	
 decs 		: declaration+;
                 
-declaration	:   decChoice -> ^(DECLARATION decChoice) 
+declaration	scope
+		{
+			ArrayList<String> attributes;
+		}
+		@init
+		{
+			$declaration::attributes = new ArrayList<String>();
+		}
+		:   decChoice -> ^(DECLARATION decChoice) 
 	| attribAdorn decChoice -> ^(DECLARATION attribAdorn decChoice);
     
 decChoice 	: procDec | bundleDec;
@@ -241,8 +249,11 @@ channelDecStmt2
 	
 channelDir 	: '->' | '<-';
 
-// TODO add constructors
-attrib 		: '[' ID ']' -> ID;
+// TODO add attribute constructors
+attrib 		: '[' ID ']' 
+		{
+			$declaration::attributes.add($ID.text);
+		} -> ID;
 
 attribAdorn 	: attrib+ -> ^(ADORNMENTS attrib+);
 
@@ -265,7 +276,7 @@ procDec 	scope
 				++errorCount;
 			} 
 			else {
-				ProcType procType = new ProcType($pname, $typeId.t, $procDec::params, $procDec::locals, $procDec::currentScope);
+				ProcType procType = new ProcType($pname, $typeId.t, $declaration::attributes, $procDec::params, $procDec::locals, $procDec::currentScope);
 				types.put(procType.getName(), procType);	
 			}
 		} -> ^('proc' ID ID paramList block);
