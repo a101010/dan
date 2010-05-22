@@ -339,9 +339,9 @@ saveState(ap->state, <procType>_S<labelNum>);
 
 <exitChecks>
 
-if(exception > 0)
+if(exceptions > 0)
 {
-    printf("<procType>: exceptions from %d processes, retiring the other processes in the par\n", exception);
+    printf("<procType>: exceptions from %d processes, retiring the other processes in the par\n", exceptions);
     // TODO what is the best way to clean up all the processes?
 }
 
@@ -368,7 +368,7 @@ else
 procConstructor(procType, suffix, args) ::= <<
 
 <procType>_locals_ctor( &(locals->__p<procType><suffix>.locals), <args; seperator=", ">);
-proc_ctor( (proc*) &(locals->__p<procType><suffix>), "<procType>", p, <procType>_body);
+proc_ctor( (proc*) &(locals->__p<procType><suffix>), "<procType>", ap, <procType>_body);
 s->schedule(s, (proc*) &(locals->__p<procType><suffix>));
 
 >>
