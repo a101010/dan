@@ -1,0 +1,59 @@
+// Copyright 2007, Alan Grover
+
+// This is a sample of prototype Danger implementing the infamous commstime program.
+
+import GetTimeNano from Time
+
+bundle BInt:
+	channel c ->
+	protocol = c ! int32 -> c ? int32 -> BInt // specified in CSP as a process
+
+
+
+proc void Delta(BInt? in, BInt! out1, BInt! out2):
+	int32 value
+	while (true):		
+		in1.c ? value
+		out.c ! value
+		out2.c ! value
+			
+proc void Succ(BInt? in, BInt! out):
+	int32 value
+	while (true):
+		in.c ? value
+		out.c ! value + 1
+		
+proc void Prefix(BInt? in, BInt! out, int32 initValue):
+	int32 value = initValue
+	out.c ! value
+	while (true):
+		in.c ? value
+		out.c ! value
+
+proc void Count(BInt? in):
+	int32 value
+	int32 step = 100000
+	[debug]:
+		int32 time // in nanoseconds
+	while (true):
+		int32 i = 0
+		[debug]:
+			time = GetTimeNano()
+		while (i < step):
+			in.c ? value
+			i = i + 1
+		[debug]:
+			time = GetTimeNano() - time
+			debug ! "Time for {0} iterations: {1} ns" % (step, time)
+			debug ! "Time for 1 iteration: {0} ns" % ((float64)time / (float64)step)
+		
+		
+[main]
+proc void Commstime():
+	BInt a, b, c, d
+	par:
+		Prefix(d?, a!)
+		Delta(a?, b!, c!)
+		Succ(c?, d!)
+		Count(b?)
+		
