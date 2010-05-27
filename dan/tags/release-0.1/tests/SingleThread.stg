@@ -1,0 +1,491 @@
+group SingleThread;
+
+danModule(frontMatter, imports, decs) ::= <<
+// C file generated from Danger source code by the dan compiler
+<frontMatter>
+
+#include \<stdio.h\> // TODO write string, logging, and io libs for Danger
+#include \<time.h\>  // TODO write a time lib for Danger
+#include \<__struntime.h\>
+
+// ---------------------------------------
+// I m p o r t s
+// ---------------------------------------
+<imports>
+
+// ---------------------------------------
+// D e c l a r a t i o n s
+// ---------------------------------------
+
+<decs>
+>>
+
+importStmt(library, symbol) ::= <<
+// import: library= <library> symbol= <symbol>
+
+>>
+
+attrib(attribId) ::= <<
+// [<attribId>]
+
+>>
+
+adornedDec(attribs, dec) ::= <<
+
+// -------------------------------------
+// Adorned declaration
+// -------------------------------------
+// Attribute section:
+<attribs>
+<dec>
+
+>>
+
+simpleBundleDec(bundleType, 
+                channelDeclarations,
+                channelConstructors,
+                readEnds,
+                writeEnds) ::= <<
+// ----------------------------------------------
+// <bundleType> channel bundle type
+
+typedef struct BundleR_<bundleType>_tag
+{
+    <readEnds>
+} BundleR_<bundleType>;
+
+typedef struct BundleW_<bundleType>_tag
+{
+    <writeEnds>
+} BundleW_<bundleType>;
+
+// backing store for <bundleType> channel bundle
+typedef struct Bundle_<bundleType>_tag
+{
+
+    BundleR_<bundleType>   *read;
+    BundleW_<bundleType>   *write;
+    BundleR_<bundleType>   readStore;
+    BundleW_<bundleType>   writeStore;
+    <channelDeclarations>
+} Bundle_<bundleType>;
+
+
+
+// <bundleType>_chans constructor
+Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans)
+{
+    <channelConstructors>
+    
+    chans->read = &(chans->readStore);
+    chans->write = &(chans->writeStore);
+    return chans;
+}
+
+
+// End of <bundleType> bundle type
+
+
+>>
+
+channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
+<chanType>_ctor( &(chans-><chanName>), <readEndId>, <writeEndId>);
+chans->readStore.<chanName> = chans-><chanName>.ends.read;
+chans-><chanName>.ends.read = 0; // because it is a mobile type
+chans->writeStore.<chanName> = chans-><chanName>.ends.write;
+chans-><chanName>.ends.write = 0;
+>>
+
+instanceParam(procType) ::= <<
+<procType>_locals * locals
+>>
+
+procDec(procType,
+        locals,
+        params,
+        initLocals,
+        procBodyScratchInit,
+        statements,
+        cleanup) ::= <<
+// ----------------------------------------------
+// <procType> PROC type
+typedef struct <procType>_locals_tag
+{
+    <locals>
+} <procType>_locals;
+
+typedef struct <procType>_proc_tag
+{
+    proc                        p;
+    <procType>_locals           locals;
+} <procType>_proc;
+
+// <procType>_locals constructor
+<procType>_locals * <procType>_locals_ctor(<params; separator=", ">)
+{
+  <initLocals>
+  
+  return locals;
+}
+
+void <procType>_body(proc * ap, scheduler * s)
+{
+    <procBodyScratchInit>
+    
+    <procType>_proc* p = (<procType>_proc*) ap;
+    <procType>_locals* locals = &(p->locals);
+    if(ap->state != _PS_READY_TO_RUN_)
+        restoreState(ap->state);
+
+    <statements>
+    
+    ap->state = _PS_CLEAN_EXIT_;
+EXIT:
+    if((ap->state == _PS_EXCEPTION_) || (ap->state == _PS_CLEAN_EXIT_) )
+    {
+        <cleanup>
+    }
+}
+
+// End of <procType> PROC type
+
+
+>>
+
+procDecLite(procType, returnType, params, statements) ::= <<
+// TODO use procDecLite for procs that don't have par, fork, or do channel comms
+// <returnType> <procType>(<params; separator=", ">)
+/* 
+    <statements>
+*/
+
+>>
+
+defaultCleanup(type, name) ::= <<
+// don't need to cleanup <name> of type <type>
+
+>>
+
+bundleEndCleanup(type, name) ::= <<
+locals-><name>->poison(locals-><name>->chans, s);
+
+>>
+
+bundleCleanup(type, name) ::= <<
+Poison_<type>(&<name>, s);
+
+>>
+
+localValueDec(type, name) ::= <<
+<type> <name>;
+
+>>
+
+localByRefDec(type, name) ::= <<
+<type> *<name>;
+
+>>
+
+initLocal(name, value) ::= <<
+locals-><name> = <value>; 
+
+>>
+
+
+constructLocal(type) ::= <<
+// TODO construct local <type>
+
+>>
+
+
+
+valueParam(type, name) ::= "<type> <name>"
+
+refParam(type, name) ::= "<type> *<name>"
+
+
+ifStatement(condition, statements) ::= <<
+if ( <condition> )
+{
+    <statements>
+}
+
+>>
+
+elseIfStatement(condition, statements) ::= <<
+else if ( <condition> )
+{
+    <statements>
+}
+
+>>
+
+elseStatement(statements) ::= <<
+else
+{
+    <statments>
+}
+
+>>
+
+whileStatement(condition, statements) ::= <<
+while ( <condition> )
+{
+    <statements>
+}
+
+>>
+
+receiveStatement(procType, chanr, target, labelNum, targetCleanup) ::= <<
+// receive statement
+<targetCleanup>
+saveState(ap->state, <procType>_S<labelNum>);
+// TODO use the type parameter
+result = locals-><chanr>->read( locals-><chanr>->channel, &type, &(locals-><target>), &ap->exception, ap, s);
+switch(result)
+{
+case 0 : // read value
+    printf("<procType>: read value %d from <chanr>\n", locals-><target>);
+    break;
+case 1 : // blocked
+    // let it read again
+    goto EXIT;
+case 2 : // exception
+    ap->state = _PS_EXCEPTION_;
+    goto EXIT;
+default:
+    printf("unexpected result from read on <chanr> in <procType>_body: %d\n", result);
+    ap->state = _PS_EXCEPTION_;
+    ap->exception = "unexpected result from read on <chanr> in <procType>_body";
+    goto EXIT;
+}
+
+>>
+
+sendStatement(procType, chanw, source, labelNum, sourceCleanup) ::= <<
+// send statement
+// TODO use the type parameter
+result = locals-><chanw>->write( locals-><chanw>->channel, 0, <source>, (void **) &ap->exception, ap, s);
+switch(result)
+{
+case 0 : // wrote value
+    printf("<procType>: wrote <source> to <chanw>\n", <source>);
+    break;
+case 1 : // blocked
+    saveState(ap->state, <procType>_S<labelNum>);
+    if(result == 1)
+        goto EXIT;
+    result = locals-><chanw>->writeHandshake( locals-><chanw>->channel, (void **) &ap->exception, ap, s);
+    switch(result)
+    {
+    case 0 : // wrote value
+        printf("<procType>: wrote <source> to <chanw>\n", <source>);
+        break;
+    case 1 : // blocked
+        goto EXIT;
+    case 2 : // exception
+        ap->state = _PS_EXCEPTION_;
+        goto EXIT;
+    default:
+        printf("unexpected result from write to <chanw> in <procType>_body: %d\n", result);
+        ap->state = _PS_EXCEPTION_;
+        ap->exception = "unexpected result from write to <chanw> in <procType>_body";
+        goto EXIT;
+    }
+    break;
+case 2 : // exception
+    ap->state = _PS_EXCEPTION_;
+    goto EXIT;
+default:
+    printf("unexpected result from write to <chanw> in <procType>_body: %d\n", result);
+    ap->state = _PS_EXCEPTION_;
+    ap->exception = "unexpected result from write to <chanw> in <procType>_body";
+    goto EXIT;
+}
+<sourceCleanup>
+
+>>
+
+assignmentStatement(target, targetCleanup, source, sourceCleanup) ::= <<
+locals-><target> = <source>;
+<targetCleanup>
+<sourceCleanup>
+
+>>
+
+binaryOp(left, right, op) ::= <<
+(<left> <op> <right>)
+>>
+
+xorOp(left, right) ::= <<
+((<left> && !(<right>)) || (!(<left>) && <right>))
+>>
+
+unaryOp(op, operand) ::= <<
+<op>(<operand>)
+>>
+
+simpleStatement(statement) ::= <<
+<statement>;
+
+>>
+
+functionCall(function, args) ::= <<
+<function>(<args; separator=", ">)
+>>
+
+parStatement(procType, constructors, labelNum, exitChecks, numProcs, checkCleanExit) ::= <<
+
+// par statement
+<constructors>
+
+saveState(ap->state, <procType>_S<labelNum>);
+
+<exitChecks>
+
+if(exceptions > 0)
+{
+    printf("<procType>: exceptions from %d processes, retiring the other processes in the par\n", exceptions);
+    // TODO what is the best way to clean up all the processes?
+}
+
+if(finished == <numProcs>)
+{
+    if(<checkCleanExit; separator="\n\t|| ">)
+    {
+        ap->state = _PS_EXCEPTION_;
+        printf("<procType>: all procs exited PAR, but not all cleanly\n");
+        goto EXIT;
+    }
+    else
+    {
+        printf("<procType>: PAR exiting cleanly\n");
+    }
+}
+else
+{
+    goto EXIT;
+}
+// end of par statement
+>>
+
+procConstructor(procType, suffix, args) ::= <<
+
+<procType>_locals_ctor( &(locals->__p<procType><suffix>.locals), <args; separator=", ">);
+proc_ctor( (proc*) &(locals->__p<procType><suffix>), "<procType>", ap, <procType>_body);
+s->schedule(s, (proc*) &(locals->__p<procType><suffix>));
+
+>>
+
+procExitCheck(callerType, procType, suffix) ::= <<
+
+lock(locals->__p<procType><suffix>.p.spinlock);
+if(locals->__p<procType><suffix>.p.sched_state == _FINISHED_)
+{
+    finished += 1;
+    if(locals->__p<procType><suffix>.p.state == _PS_EXCEPTION_)
+    {
+        exceptions += 1;
+        ap->state = _PS_EXCEPTION_;
+        ap->exception = locals->__p<procType><suffix>.p.exception;
+        printf("<callerType>: caught exception from __p<procType><suffix>\n");
+
+    }
+    else if(locals->__p<procType><suffix>.p.state !=  _PS_CLEAN_EXIT_)
+    {
+        exceptions += 1;
+        ap->state = _PS_EXCEPTION_;
+        ap->exception = "<callerType>: p<procType><suffix> didn't exit cleanly, but didn't throw exception\n";
+    }
+}
+unlock(locals->pCount1.p.spinlock);
+
+>>
+
+procCleanExitCheck(procType, suffix) ::= <<
+locals->__p<procType><suffix>.p.state != _PS_CLEAN_EXIT_
+>>
+
+typeId(id) ::= <<
+<id>
+>>
+
+param(type, name) ::= <<
+<type> <name>
+>>
+
+genericArgList(args) ::= <<
+<args>
+>>
+
+paramList(params) ::= <<
+<params>
+>>
+
+statementList(statements) ::= <<
+<statements; separator="\n">
+
+>>
+
+constructorStaticNoArgs(type, value) ::= <<
+// constructorStaticNoArgs
+<type>_ctor( &(locals-><value>) );
+
+>>
+
+constructorStaticWiArgs(type, value, args) ::= <<
+// constructorStaticWiArgs
+<type>_ctor( &(locals-><value>), <args> );
+
+>>
+
+constructorDynamicNoArgs(type, pool, size) ::= <<
+// constructorDynamicNoArgs
+value = <pool>->malloc(<size>);
+<type>_ctor( &value );
+
+>>
+
+constructorDynamicWiArgs(type, pool, size) ::= <<
+// constructorDynamicWiArgs
+value = <pool>->malloc(<size>);
+<type>_ctor( &value, <args> );
+
+>>
+
+mainProc(mainProcDec, mainProcName) ::= <<
+<mainProcDec>
+
+// TODO int main(int argc, char ** argv)
+int main()
+{
+    Scheduler_default ctxt;
+    // TODO allow main proc to get argv and default channels
+    <mainProcName>_proc mainProc;
+    int ret_val = 0;
+
+    default_scheduler_ctor(&ctxt);
+
+    
+    <mainProcName>_locals_ctor(&(mainProc.locals));
+
+    
+    proc_ctor((proc*) (&mainProc), "<mainProcName>", 0, <mainProcName>_body);
+
+    ret_val = Schedule_default( &(ctxt.s), (proc*) (&mainProc)); // TODO just exit?  assert: ctxt.num_ready == 0 if ret_val != 0
+    
+
+    ret_val = default_scheduler_run(&ctxt);
+
+    if(ctxt.num_unready > 0)
+    {
+        printf("Number of deadlocked processes = %d\n", ctxt.num_unready);
+        ret_val = 1;
+    }
+
+    printf("Press \<enter\> to exit.\n");
+    getchar();
+    return ret_val;
+}
+
+>>

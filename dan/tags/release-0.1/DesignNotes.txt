@@ -1,0 +1,258 @@
+
+High Level Requirements
+    - support good concurrent design by default
+        - isolated processes
+        - channels
+        - shared memory only when protected by locks
+        - not single stack based
+        - mobile rather than reference types
+    - develop at the systems level
+        - do anything C can do (doesn't have to be as easy as in C though)
+          for instance, should be able to have
+            - completely static (but not stack based) allocation 
+              (with the possible excpetion of messages, although they could
+              be implemented by copying)
+            - pass a buffer to be filled with a structure
+        - write a scheduler, driver, or OS
+        - do real-time and embedded development
+    - use functional/declarative style when appropriate
+    - make very common operations very easy
+        - messages/serialization
+        - strings
+        - collections
+    - support OO safe for concurrant environment
+    - by default, type objects are generated, but they can be
+      suppressed when not needed to support embedded development
+      (but need to avoid the idiocy of Java in that regard, esp for
+      generic arrays, etc)
+    - support generics
+    - support continuations
+    - can call and (possibly) be called from C
+    - not too hard to port
+    - the following are explicitly out of scope:
+        - emphasis on a completely minimalistic language
+        - completely general object model
+        
+        
+        
+ Object model
+ _____________
+ 
+    - Object: There may be at least a conceptual unifying 'Object' class, but it cannot be 
+      directly inherited from.  May be a type object for it that provides default ToString etc.
+        - Primitives: value types: integers, floats, bools, bytes.
+        - Pointers: procs that use must be marked unsafe. 
+            ptr<type>
+            addressOf operator
+            address operator
+            E.g.
+                MyType a = new MyType();
+                ptr<MyType> b = addressOf(a);
+                MyType c = b.value;
+                ptr<byte> d = address(0xfaa7beef);
+                d = d + 2;
+                (d + 2).value = 0xaa;
+            Hopefully pointers will not be needed very often.
+        - Enums: value types based on an integer type. 
+        - Proc: a process or proceedure
+          May not be inherited.
+          Has no external interface except its call interface.
+          May be statically (par) or dynamically (fork) allocated.
+          All locals are isolated; no shared memory.
+          By default may not be recursive.
+          May be generated as a closure.
+          Communicate only through Channels or SharedObjects.
+            - MobileProc: a proc that can save its state (as a Message) and obeys
+              a standard connect/disconnect protocol.
+              Can also save its code in the message.  (Once we've got a standard
+              Intermediate Language to suport such a feature.)
+              Not sure this one can be a closure, but let's give it a go. :) 
+            - RecursiveProc: a proc that can dynamically allocate itself or other procs 
+              recursively. May be generated as a closure.
+        - Message: invariant and read only
+          May not have pointers or references.  Must be composed of BuiltIns and 
+          Messages.
+          May not be inherited or define methods. (I may reconsider this one, if
+          Strings are to be Messages.)
+          May have structure that requires parsing (repeated or optional elements).
+        - Channel: allows the communcation of primitive types and mobile types.
+          Abstract base class.  Can accept either a type or a protocol (sequence of types).
+          Cannot normally be user-inherited. (or at least tight restrictions on user created
+          Channel types)
+          Have a reader and writer end, which act like Mobiles but can't be user defined.
+          Their life-line is connected to the channel ends.  They are freed when the
+          last channel end is freed.  They have no external interface except their ends.
+            - SychronousChannel: The writer blocks until the channel has been read.
+              Has no buffer.
+              
+                channel<protocol>() or channel<protocol>(0) or channel<protocol>(0, block)
+              
+            - NChannel: has N slots and blocks when full.
+            
+                channel<protocol>(N) or channel<protocol>(N, block)
+            
+            - UnboundedChannel: can grow to the limits of memory.
+            
+                channel<protocol>(unbounded)
+            
+            - OverflowingChannel: has N slots, and looses additional messages when full.
+            
+                channel<protocol>(N, overflow)
+            
+            - OverwritingChannel: has N slots, and looses the oldest message when full.
+            
+                channel<protocol>(N, overwrite)
+            
+            - PriorityChannel: highest priority message is read first, unbounded.
+            
+                channel<protocol>(unbounded, priority)
+            
+            - NPriorityChannel: as PriorityChannel, but N-slot.  Low priority are discarded
+              when full.
+              
+                channel<protocol>(N, priority)
+              
+            The number of slots is for a complete protocol sequence.  Priority channels
+            have a protocol of <someUnsignedIntType>, <someOtherProtocolSequence>.  
+            Highest priority is lowest value; 0 is highest priority.
+            
+            These look like constructors, but they choose the channel behavior at 
+            compile time, not run time.  The second parameter is a channel behavior.
+            Eventually I'd like to support user defined channel behaviors.  For v1.0
+            they are keywords, as is 'unbounded'.
+            
+            They are not used as constructors in channel bundle declarations.
+            See below.
+            
+        - ChannelReader: Can read from or poison a channel. chanr<protocol>
+        - ChannelWriter: Can write to or poison a channel.  chanw<protocol>
+        
+            E.g.
+                channel<int32> a = new(local) channel<int32>(4, overflow);
+                chanr b = a.Read;
+                chanw c = a.Write;
+        
+        - Bundle: groups related channels.  Can have a protocol that spans the bundle.
+          (TODO, need to decide how to do buffer sizes for bundle protocols.  I imagine
+          we'll either specify for each channel in the bundle protocol or in the protocol
+          itself)  Bundle protocols should be sophisticated enough to support things like
+          sliding window protocols. Should be able to do the TCP state machine as a 
+          bundle protocol.
+          A bundle type declaration consists of an optional constructor (which has no body,
+          it is a way to pass size parameters to channel declarations and to the 
+          bundle protocol), channel declarations, and an optional bundle protocol.
+          Channel declarations are of one of two forms:
+            channel <name> <dirspec>;
+            channel<<protocol>>(N, <behavior>) <name> <dirspec>;
+          The first form indicates the channel participates in the bundle protocol.
+          The second is an independent channel with its own protocol, and may
+          be any of the forms listed in the channels section above.
+          
+          dirspec: -> | <- 
+            represents the direction of the channel releative to the bundle
+            A channel with dirspec '->' has its read end in the read end of the
+            bundle; one with dirspec '<-' has the read end in the write end of
+            the bundle.
+          
+          
+          E.g.
+            Bundle MyBundleType
+            {
+                MyBundleType(int bufferSize);
+            
+                channel<MyChannelProtocl>(bufferSize, overwrite) a ->;
+                channel<int32>(bufferSize, overwrite) b <-;
+                channel c ->;
+                channel d <-;
+               
+                protocol { TODO }
+            }
+          
+        - BundleEnd: holds the channel ends of a bundle. 
+            To refer to the type of the end: <BundleType>.<Reader/Writer>
+            To refer to the ends:  <bundle>.<Read/Write>
+            E.g.
+                Bundle MyBundleType {...}
+                ...
+                MyBundleType a = new MyBundleType();
+                MyBundleType.Reader b = a.Read;
+                MyBundleType.Writer c = a.Write;
+        - Exception: as usual, but may possibly be a subclass of Message
+        - MobileObject: arbitrary objects that may have internal structure.  They may have 
+          either 'mobile' or 'local' references to other mobile types.  A 'mobile' ref is 
+          moved by an assignment operation, not just copied.  The compiler will prohibit
+          access to the previous ref within a proc until it is assigned again.
+          A local ref means the object has been allocated in the private 
+          heap of the enclosing object.  The object and its private heap are allocate 
+          in the same single envelope.  
+          Only one proc at a time may have a reference to an envelope and all the objects
+          within it.  A proc may have envelope references to objects in an envelope it has a 
+          reference to, but they are nulled when the envelope is moved from the proc.
+          A deep copy of an object in an envelope may be created as a new independent 
+          mobile object.  Shallow copies may only exist in the same envelope or as
+          envelope references in the owning proc.
+        - SharedObject: Basically a gateway object to a MobileObject that
+          can be cloned and shared among multiple procs.  Access is either by a simple
+          mutex or upgradable-reader/writer locks.  A proc can create references to objects
+          in the SharedObject's envelope which are nulled when the lock is released.
+          The SharedObject's lifeline is controlled by the original gateway object.  when
+          it goes out of scope, all further accesses to the other gateway objects will 
+          throw an exception. (Could modify that and have a reference counting scheme.
+          last gateway to go out of scope deallocates the object.  But that may be harder
+          to control.  May need both...)
+        - UnsafeObject: the same as Object in most other languages. Will only be supported
+          if requirements cannot be met with Mobile and Shared Objects, and will require
+          'unsafe' keyword on procs that use them directly.  (Most likely uses: schedulers,
+          custom channels, and other bare metal systems programing.)
+    - Interface: in the spirit of Java/C#
+        - IScheduler: a standard interface that can be used to develop custom schedulers
+        - IChannel: a standard interface for custom channels
+        - Not sure how useful they will be otherwise, but can try it with MobileObject and
+          SharedObject as bases.
+                    
+ 
+ Mobile Types and References
+ ______________
+ 
+ In addition to MobileObject, any of the reference types are considered 'mobile types'.
+ Any mobile type may be created dynamically and assigned to a mobile reference, or may
+ be statically allocated to a static reference in the envelope of a proc.  
+ 
+ Static allocation and references have severe restrictions; a proc can only communicate 
+ them by reference to procs that can be gauranteed to complete before the allocating proc.
+ That means only procs that declare static parameters and are called in a par (no forks
+ allowed).  They may be transmitted by value via channels.
+ 
+ However, dynamic allocation and references are the default.
+ 
+ When a mobile type is assigned to a reference, the previous reference becomes null.
+ The compiler will generate an error if a proc attempts to access a mobile reference
+ after it has been an assignment source.
+ 
+ For example:
+ 
+ MyMobileType refA = new(local) MyMobileType();
+ MyMobileType refB = refA;
+ refB.SomeMethod(); // legal
+ refA.SomeMethod(); // illegal, will generate a compiler error.
+ someChan ! refB;
+ refB.SomeMethod(); // illegal, the object has left the proc and the compiler will
+                    // complain
+                    
+ Mobile types are freed when they go out of scope.
+ 
+ For example:
+ 
+ proc void foo()
+ {
+    MyMobileType refA = new(local) MyMobileType();
+    refA.SomeMethod();
+ }
+ 
+ Since refA is not communicated via a channel or a proc call it goes out of scope and
+ is freed when foo exits.
+ 
+ Channels and Bundles are an exception to this rule, as noted above.  They are freed when their last
+ end goes out of scope, but are poisoned when the first end goes out of scope.  Ends are 
+ allocated with their Channel.  Bundles are allocated with all of their channels and ends.
+ Other than that, they behave as other mobile types.
