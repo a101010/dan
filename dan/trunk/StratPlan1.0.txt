@@ -1,0 +1,86 @@
+Danger Language 
+
+Strategic plan for Danger 1.0
+
+commstime
+basic scheduling
+static allocation
+procs in pars
+
+0.1 - complete
+
+module linking/libraries
+proc calls outside par
+tail recursive proc calls
+
+1st unit tests
+compiler error handling
+
+0.2
+
+alt
+timeouts
+skip
+strings basic
+invariant objects
+dynamic memory
+recursive procs
+exceptions
+tuples
+
+primitive types first pass complete (will be finished as part of 1.0 libs definition, post 0.5)
+
+0.3
+
+mobile channels and bundles
+mutable envelope objects
+envelop objects with envelope allocation
+shared envelop objects
+interfaces
+type inference
+arrays
+
+0.4 
+
+basic time library
+basic file library
+basic network library
+basic collections library/or builtin collections types (vector and map)
+
+0.5
+
+validation and verification of 1.0 scope
+plan versions through 0.9
+
+installer
+
+scheduler and memory pool interfaces
+
+generics 
+attributes
+reflection
+lambdas
+properties
+
+fast alt
+define & implement 1.0 libraries
+runtime support for windows & linux threads (multi-core support)
+runtime support for bare metal multi-core
+C or other language interop
+define & implement 1.0 strings
+
+0.9
+
+Testing, testing, 1, 2, 3, testing.
+
+1.0
+
+
+explicitly deffered to 2.0
+
+performance
+application binary interface
+assembly language target
+debugger
+
+
