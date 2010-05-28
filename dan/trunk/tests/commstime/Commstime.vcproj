@@ -180,7 +180,27 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\bint.c"
+				>
+			</File>
+			<File
 				RelativePath=".\commstime.c"
+				>
+			</File>
+			<File
+				RelativePath=".\count.c"
+				>
+			</File>
+			<File
+				RelativePath=".\delta.c"
+				>
+			</File>
+			<File
+				RelativePath=".\prefix.c"
+				>
+			</File>
+			<File
+				RelativePath=".\succ.c"
 				>
 			</File>
 		</Filter>
