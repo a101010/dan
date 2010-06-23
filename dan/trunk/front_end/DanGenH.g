@@ -27,7 +27,7 @@ public HashMap<String, DanType> types;
 public String assignTarget = null;
 }
 
-prog		: imports decs -> danModule(frontMatter={"// TODO frontmatter"},
+prog		: imports decs -> danHeader(frontMatter={"// TODO frontmatter"},
 					    imports={$imports.st}, 
 					    decs={$decs.st});
 
@@ -68,10 +68,9 @@ bundleDec 	scope
 			StringTemplate cc = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::channelConstructors));
 			StringTemplate re = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::readEnds));
 			StringTemplate we = templateLib.getInstanceOf("statementList", new STAttrMap().put("statements", $bundleDec::writeEnds));
-			retval.st = templateLib.getInstanceOf("simpleBundleDec",
+			retval.st = templateLib.getInstanceOf("simpleBundleHeaderDec",
 							      new STAttrMap().put("bundleType", $ID.text)
 							                     .put("channelDeclarations", cd)
-							                     .put("channelConstructors", cc)
 							                     .put("readEnds", re)
 							                     .put("writeEnds", we));
 							      
@@ -94,11 +93,6 @@ bundleStmt	: ^(BUNDLE_STATEMENT channelDecStmt1 channelDir)
 			$bundleDec::channelDeclarations.add(templateLib.getInstanceOf("localValueDec",
 					new STAttrMap().put("type", "__c0bs32")
 					               .put("name", name)));
-			$bundleDec::channelConstructors.add(templateLib.getInstanceOf("channelConstructorCall",
-					new STAttrMap().put("chanType", "__c0bs32")
-					               .put("chanName", name)
-					               .put("readEndId", "\"readEndId\"")
-					               .put("writeEndId", "\"writeEndId\"")));
 			if($channelDir.forward)
 			{
 				// TODO add a mapping from channel types to channel end types
@@ -159,37 +153,13 @@ procDec 	scope
 		@init
 		{
 			$procDec::type = null;
-			// TODO at the moment cleanup is only at the end of a proc
-			// and always occurs
-			// Need to allow ref types that are passed as messages or 
-			// one-way parameters to skip cleanup
-			// Would be nice if cleanup occurs on last use, rather than 
-			// at the end of the proc
-			$procDec::cleanup = new ArrayList<StringTemplate>();
-			$procDec::initLocals = new ArrayList<StringTemplate>();
-			$procDec::scratchInit = new ArrayList<StringTemplate>();
-			$procDec::hasIo = false;
-			$procDec::hasPar = false;
-			$procDec::labelNum = 0;
 		}
 		: ^('proc' returnType=ID name=ID 
 		{ 
 			$procDec::type = (ProcType) types.get($name.text); 
-		} paramList block[false]) 
+		} paramList block) 
 		{
 			ProcType type = $procDec::type;
-			ArrayList<StringTemplate> scratchInit = new ArrayList<StringTemplate>(3);
-			
-			if($procDec::hasIo){
-				scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
-	                        	new STAttrMap().put("scratchInit", "int result = 0; // for the result of read and write ops\nType type; //TODO use the Type\n")));
-                        }
-                        if($procDec::hasPar){
-				scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
-	                        	new STAttrMap().put("scratchInit", "int finished = 0; // for the number of procs in a par that have finished\n")));
-	                        scratchInit.add(new StringTemplate(templateLib, "<scratchInit>",
-	                        	new STAttrMap().put("scratchInit", "int exceptions = 0; // for the number of procs in a par that threw exceptions\n")));                        	
-                        }
                         
                         ArrayList<StringTemplate> locals = new ArrayList<StringTemplate>(type.Locals.size());
                         
@@ -226,14 +196,10 @@ procDec 	scope
                         	}
                         }
                         
-                        StringTemplate procDecTemplate = templateLib.getInstanceOf("procDec",
+                        StringTemplate procDecTemplate = templateLib.getInstanceOf("procHeaderDec",
 					new STAttrMap().put("procType", $name)
 					               .put("locals", locals)
 					               .put("params", params)
-					               .put("initLocals", $procDec::initLocals)
-					               .put("procBodyScratchInit", scratchInit)
-					               .put("statements", $block.st)
-					               .put("cleanup", "// cleanup")
 					               );
 			
 			// TODO add check for duplicate main (not here... have to check across all libraries and modules)
@@ -245,14 +211,13 @@ procDec 	scope
 				}
 			}
 			
-			if(isMain){
-				retval.st = templateLib.getInstanceOf("main",
-					new STAttrMap().put("mainProcDec", procDecTemplate)
-					               .put("mainProcName", type.getName())
-					               );
-			} else {
+			if(!isMain){
 				retval.st = procDecTemplate;
 			}
+			else {
+				retval.st = new StringTemplate("// Don't need a [main] proc in the header TODO verify");
+			}
+			
 		};
 
 paramList 	: ^(PARAMLIST rameses+=param*) -> paramList(params={$rameses});
@@ -273,198 +238,74 @@ paramStorageClass
 	:	'static' | 'mobile';
 
 param 		: ^(PARAM paramStorageClass typeId name=ID) 
-		{
-			StringTemplate initLocal = templateLib.getInstanceOf("initLocal",
-					new STAttrMap().put("name", $name)
-					               .put("value", $name)
-					               );
-			$procDec::initLocals.add(initLocal);
-			
-			/*StringTemplate paramTemplate;
-			DanType paramType = types.get($typeId.text);
-			if(paramType.isByRef()){
-				paramTemplate = templateLib.getInstanceOf("refParameter",
-					new STAttrMap().put("type", paramType.getEmittedType()).put("name", $name));
-			} else {
-				paramTemplate = templateLib.getInstanceOf("valueParameter", 
-					new STAttrMap().put("type", paramType.getEmittedType()).put("name", $name));
-			}
-			retval.st = paramTemplate;*/
-		} -> param(type={$typeId.st}, name={$name});
+		-> param(type={$typeId.st}, name={$name});
 
 
-// TODO any statement can be launched as an anonymous proc in a par
-statement 	: whileStmt { $statement.st = $whileStmt.st; }
-			| ifStmt { $statement.st = $ifStmt.st; } 
-			| cifStmt  -> template(cif={"// cif statement\n"}) "<cif>" 
-			| parStmt  { $statement.st =  $parStmt.st; }
-			| succStmt  -> template(succ={"// succ statement\n"}) "<succ>" 
-			| block[false]  { $statement.st = $block.st; }
-			| simpleStatement { $statement.st = $simpleStatement.st; };
+statement 	: whileStmt 
+			| ifStmt 
+			| cifStmt   
+			| parStmt  
+			| succStmt  
+			| block  
+			| simpleStatement;
 
 simpleStatement 
-		: varDecStmt { $simpleStatement.st = $varDecStmt.st; }
-			| channelDecStmt2 -> template(chanDec={"// chanDecStmt2\n"}) "<chanDec>"
-			| sendStmt { $simpleStatement.st = $sendStmt.st; }
-			| receiveStmt { $simpleStatement.st = $receiveStmt.st; }
-			| assignStmt { $simpleStatement.st = $assignStmt.st; }
-			| returnStmt -> template(return={"// return statement\n"}) "<return>"
-			| call[true] { $simpleStatement.st = $call.st; };
+		: varDecStmt 
+			| channelDecStmt2 
+			| sendStmt 
+			| receiveStmt 
+			| assignStmt 
+			| returnStmt 
+			| call;
 
-block 		[boolean isPar]
-		scope
-		{
-			boolean isInPar;
-		}
-		@init 
-		{
-			$block::isInPar = false;
-		}
-		: ^(BLOCK  
-		{ 
-			if($block::isInPar) {
-				// TODO for this case the block is a statement in the par's block (as opposed to the par's block or a 
-				// nested block) and needs to be launched as a proc
-				// not currently supported
-			}
-			$block::isInPar = $isPar; /* so the scope variable is only true for the par's block, not nested blocks */ 
-		} statements+=statement+) -> template(statements={$statements}) "<statements>";
+block 		: ^(BLOCK  statements+=statement+);
 
-whileStmt 	: ^('while' exp block[false]) -> whileStatement(condition={$exp.st}, statements={$block.st});
+whileStmt 	: ^('while' exp block);
 
-ifStmt		: ^('if' exp block[false]) -> ifStatement(condition={$exp.st}, statements={$block.st});
+ifStmt		: ^('if' exp block);
 
-cifStmt 	: ^('cif' ID block[false]);
+cifStmt 	: ^('cif' ID block);
 
-parStmt		scope
-		{
-			int numProcs;
-			ArrayList<StringTemplate> procConstructors;
-			ArrayList<StringTemplate> procExitChecks;
-			ArrayList<StringTemplate> cleanExits;
-		}
-		@init
-		{
-			$parStmt::numProcs = 0;
-			$parStmt::procConstructors = new ArrayList<StringTemplate>();
-			$parStmt::procExitChecks = new ArrayList<StringTemplate>();
-			$parStmt::cleanExits = new ArrayList<StringTemplate>();
-		}
-		: ^('par' block[true]) 
-		{ 
-			$procDec::hasPar = true;
-			retval.st = templateLib.getInstanceOf("parStatement",
-					new STAttrMap().put("procType", $procDec::type.getEmittedType())
-					               .put("constructors", $parStmt::procConstructors)
-					               .put("labelNum", $procDec::labelNum)
-					               .put("exitChecks", $parStmt::procExitChecks)
-					               .put("numProcs", $parStmt::numProcs)
-					               .put("checkCleanExit", $parStmt::cleanExits)
-					               );
-		};
+parStmt		: ^('par' block);
 
-succStmt	: ^('succ' block[false]);
+succStmt	: ^('succ' block);
 
 storageClass	: 'static' | 'local' | 'mobile';
 
-varDecStmt 	: ^(VARDEC storageClass typeId name=ID { assignTarget = $name.text; } varInit[$name.text]) 
-		{ 
-			$varDecStmt.st = $varInit.st; 
-		};
+varDecStmt 	: ^(VARDEC storageClass typeId ID varInit);
 
-varInit		[String name]
-		: '=' exp 
-		{
-			// TODO this is a genuine bona fide hack (yick!)
-			// we hard code a template element to check if the first expression was a constructor
-			// allows supporting the limited first case of constructors to get the first demos going
-			// eventually this problem must be solved more generally
-			// TODO also need to modify assignStmt
-			if($exp.st.toString().startsWith("// constructorStatic")){
-				$varInit.st = $exp.st;
-			} else if($exp.st.toString().startsWith("// constructorDynamic")){
-				throw new RuntimeException("constructors on dynamic memory pools are not supported");
-			} else {
-				$varInit.st = templateLib.getInstanceOf("assignmentStatement",
-				new STAttrMap().put("target", name)
-					       .put("targetCleanup", "// targetCleanup")
-					       .put("source", $exp.st)
-					       .put("sourceCleanup", "// sourceCleanup"));
-			}
-			
-			
-		 //-> assignmentStatement(target={$name},
-		 //				 targetCleanup={"// targetCleanup"},
-		 //				 source={$exp.st},
-		 //				 sourceCleanup={"// sourceCleanup"})
-		}
-		| NO_INIT 
-		{
-			// TODO eventually this should probably be a default initializer
-			$varInit.st = new StringTemplate();
-		};
+varInit		: '=' exp 
+		| NO_INIT;
 
-sendStmt 	@after
-  		{
-  			$procDec::labelNum++;
-  		}
-		: ^('!' ID exp) { $procDec::hasIo = true; } 
-			-> sendStatement(procType={$procDec::type.getEmittedType()}, 
-			                 chanw={$ID.text.replaceAll("\\.", "->")}, 
-			                 source={$exp.st}, 
-			                 labelNum={$procDec::labelNum}, 
-			                 sourceCleanup={"// source cleanup"});
+sendStmt 	: ^('!' ID exp);
 
-receiveStmt	@after
-  		{
-  			$procDec::labelNum++;
-  		}
-  		: ^('?' from=ID target=ID) { $procDec::hasIo = true; }
-			-> receiveStatement(procType={$procDec::type.getEmittedType()}, 
-			                    chanr={$from.text.replaceAll("\\.", "->")}, 
-			                    target={$target.text.replaceAll("\\.", "->")}, 
-			                    labelNum={$procDec::labelNum}, 
-			                    targetCleanup={"// targetCleanup"});
+receiveStmt	: ^('?' from=ID target=ID);
 
-assignStmt 	: ^('=' ID { assignTarget = $ID.text; } exp)
-		{
-			
-			$assignStmt.st = templateLib.getInstanceOf("assignmentStatement",
-				new STAttrMap().put("target", $ID.text)
-					       .put("targetCleanup", "// targetCleanup")
-					       .put("source", $exp.st)
-					       .put("sourceCleanup", "// sourceCleanup"));
-			
-		};
+assignStmt 	: ^('=' ID { assignTarget = $ID.text; } exp);
 
 returnStmt	: ^('return' exp);
 
 
-exp	 	: literal { $exp.st = $literal.st; }
-		| ID  -> template(id={$ID.text}) "locals-><id>"
-		| constructor -> { $exp.st = $constructor.st; }
-		| call[false]  { $exp.st = $call.st; }
-		| ^('<' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<"})
-		| ^('>' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">"})
-		| ^('<=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<="})
-		| ^('>=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">="})
-		| ^('==' left=exp right=exp)-> binaryOp(left={$left.st}, right={$right.st}, op={"=="})
-		| ^('!=' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"!="})
-		| ^('or' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"||"})
-		| ^('and' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"&&"})
-		| ^('xor' left=exp right=exp) -> xorOp(left={$left.st}, right={$right.st})
-		| (^('+' exp exp))=> ^('+' left=exp right=exp) 
-			-> binaryOp(left={$left.st}, right={$right.st}, op={"+"})
+exp	 	: literal 
+		| ID  
+		| constructor
+		| call
+		| ^('<' left=exp right=exp)
+		| ^('>' left=exp right=exp)
+		| ^('<=' left=exp right=exp)
+		| ^('>=' left=exp right=exp)
+		| ^('==' left=exp right=exp)
+		| ^('!=' left=exp right=exp)
+		| ^('or' left=exp right=exp)
+		| ^('and' left=exp right=exp)
+		| ^('xor' left=exp right=exp)
+		| (^('+' exp exp))=> ^('+' left=exp right=exp)
 		| (^('-' exp exp))=> ^('-' left=exp right=exp)
-			-> binaryOp(left={$left.st}, right={$right.st}, op={"-"})
-		| ^('*' left=exp right=exp)-> binaryOp(left={$left.st}, right={$right.st}, op={"*"})
-		| ^('/' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"/"})
-		| ^('not' operand=exp) -> unaryOp(op={"!"}, operand={$operand.st})
-		| ^('+' operand=exp) ->  unaryOp(op={""}, operand={$operand.st})
-		| ^('-' operand=exp) ->  unaryOp(op={"-"}, operand={$operand.st});
-// TODO using binaryOp this way hard codes the operators here rather than making them part of the template
-// Need to either make the operator part of the template or load a file of operator symbols.
-// Really would like templates that can support various asm flavors, but will leave that for a future effort.		
+		| ^('*' left=exp right=exp)
+		| ^('/' left=exp right=exp)
+		| ^('not' operand=exp) 
+		| ^('+' operand=exp) 
+		| ^('-' operand=exp);		
 
 
 pool		returns [String poolName] 
@@ -472,88 +313,13 @@ pool		returns [String poolName]
 		| 'local'  { $poolName = "local"; }
 		| ID       { $poolName = $ID.text; };
 
-constructor	: ^(CONSTRUCTOR pool typeId argList[true]) 
-		{
-			System.out.println("made it");
-			// TODO need to deal with constructors in arbitrary expressions, not just as
-			// the sole expression of an assignStmt or varDecStmt
-			//String poolStr = $pool.st.toString();
-			String typeIdStr = $typeId.st.toString();
-			DanType type = types.get(typeIdStr.toString());
-			if(type == null){
-				throw new RuntimeException("no type information for type: " + typeIdStr);
-			}
-			if($pool.poolName.equals("static")){
-				// no args
-				if($argList.st.toString().length() == 0){
-					$constructor.st = templateLib.getInstanceOf("constructorStaticNoArgs",
-							new STAttrMap().put("type", type.getEmittedType())
-							               .put("value", assignTarget)
-							               );
-				}
-				else {
-					$constructor.st = templateLib.getInstanceOf("constructorStaticWiArgs",
-							new STAttrMap().put("type", type.getEmittedType())
-							               .put("value", assignTarget)
-							               .put("args", $argList.st) 
-							               );
-				}
-			}
-			else {
-				throw new RuntimeException("memory pools other than 'static' are not supported");
-			}
-		};
+constructor	: ^(CONSTRUCTOR pool typeId argList);
 		
-call		[boolean isStatement]
-		: ^(CALL ID argList[false])
-		{
-			if(isStatement){
-				if($block::isInPar){
-					StringTemplate procConstructor = templateLib.getInstanceOf("procConstructor",
-						new STAttrMap().put("procType", $ID.text)
-						               .put("suffix", "") // TODO autogen next suffix and correlate with locals name (Note: only need a suffix if appears more than once in the par unless nezting causes other needs)
-						               .put("args", $argList.st)
-						               ); 
-					$parStmt::procConstructors.add(procConstructor);
-					
-					StringTemplate procExitCheck = templateLib.getInstanceOf("procExitCheck",
-						new STAttrMap().put("callerType", $procDec::type.getEmittedType())
-						               .put("procType", $ID.text)
-						               .put("suffix", "") // TODO compute suffix
-						               );
-					$parStmt::procExitChecks.add(procExitCheck);
-					
-					
-					StringTemplate cleanExitCheck = templateLib.getInstanceOf("procCleanExitCheck",
-						new STAttrMap().put("procType", $ID.text)
-						               .put("suffix", "") // TODO compute suffix
-						               );
-					$parStmt::cleanExits.add(cleanExitCheck);
-					
-					
-					$parStmt::numProcs++;
-				}
-				else{
-					throw new  RuntimeException($ID.text + ": call outside par not implemented yet");
-				}
-			}
-			else{
-				throw new RuntimeException($ID.text + ": call in expression not implemented yet");
-			}
-		};
+call		: ^(CALL ID argList);
 
-argList 	[boolean isConstructor]
-		: ^(ARGLIST args+=exp+) -> template(args={$args}) "<args; separator=\", \">"
-		| ^(ARGLIST NO_ARG) 
-		{ 
-			if(isConstructor){
-				$argList.st = new StringTemplate("");
-			}
-			else {
-				$argList.st = new StringTemplate("");
-				throw new RuntimeException($procDec::type.getEmittedType() + ": no arg call not implemented"); 
-			}
-		}; // TODO this case is not properly handled in the procConstructor template
+argList 	
+		: ^(ARGLIST args+=exp+)
+		| ^(ARGLIST NO_ARG);
 
 literal 	: 'true' { $literal.st = new StringTemplate("1"); } 
 			| 'false' { $literal.st = new StringTemplate("0"); } 

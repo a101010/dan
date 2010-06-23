@@ -20,6 +20,24 @@ danModule(frontMatter, imports, decs) ::= <<
 <decs>
 >>
 
+danHeader(frontMatter, imports, decs) ::= <<
+// C header file generated from Danger source code by the dan compiler
+<frontMatter>
+
+#include \<__struntime.h\>
+
+// ---------------------------------------
+// I m p o r t s
+// ---------------------------------------
+<imports>
+
+// ---------------------------------------
+// D e c l a r a t i o n s
+// ---------------------------------------
+
+<decs>
+>>
+
 importStmt(library, symbol) ::= <<
 // import: library= <library> symbol= <symbol>
 
@@ -88,6 +106,45 @@ Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans)
 
 >>
 
+simpleBundleHeaderDec(bundleType, 
+                channelDeclarations,
+                readEnds,
+                writeEnds) ::= <<
+// ----------------------------------------------
+// <bundleType> channel bundle type
+
+typedef struct BundleR_<bundleType>_tag
+{
+    <readEnds>
+} BundleR_<bundleType>;
+
+typedef struct BundleW_<bundleType>_tag
+{
+    <writeEnds>
+} BundleW_<bundleType>;
+
+// backing store for <bundleType> channel bundle
+typedef struct Bundle_<bundleType>_tag
+{
+
+    BundleR_<bundleType>   *read;
+    BundleW_<bundleType>   *write;
+    BundleR_<bundleType>   readStore;
+    BundleW_<bundleType>   writeStore;
+    <channelDeclarations>
+} Bundle_<bundleType>;
+
+
+
+// <bundleType>_chans constructor
+Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans);
+
+
+// End of <bundleType> bundle type
+
+
+>>
+
 channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
 <chanType>_ctor( &(chans-><chanName>), <readEndId>, <writeEndId>);
 chans->readStore.<chanName> = chans-><chanName>.ends.read;
@@ -146,6 +203,32 @@ EXIT:
         <cleanup>
     }
 }
+
+// End of <procType> PROC type
+
+
+>>
+
+procHeaderDec(procType,
+        locals,
+        params) ::= <<
+// ----------------------------------------------
+// <procType> PROC type
+typedef struct <procType>_locals_tag
+{
+    <locals>
+} <procType>_locals;
+
+typedef struct <procType>_proc_tag
+{
+    proc                        p;
+    <procType>_locals           locals;
+} <procType>_proc;
+
+// <procType>_locals constructor
+<procType>_locals * <procType>_locals_ctor(<params; separator=", ">);
+
+void <procType>_body(proc * ap, scheduler * s);
 
 // End of <procType> PROC type
 
