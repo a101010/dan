@@ -12,6 +12,7 @@ procs in pars
 module linking/libraries
 proc calls outside par
 tail recursive proc calls
+unsafe C calls
 
 1st unit tests
 compiler error handling
@@ -48,6 +49,13 @@ basic network library
 basic collections library/or builtin collections types (vector and map)
 
 0.5
+
+unsafe operations
+gap analysis with C (should be roughly as capable as C eventually, even if unsafe operations aren't as easy and reflexive as in C, and even if all of C's capabilities aren't addressed in 1.0)
+asm blocks
+absolute memory locations
+
+0.6
 
 validation and verification of 1.0 scope
 plan versions through 0.9
