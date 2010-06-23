@@ -88,15 +88,28 @@ public class DanProgTest {
         StringTemplateGroup templates = new StringTemplateGroup(groupFileR);
         groupFileR.close();
 
-        // Walk the AST
+        // Walk the AST to generate header
         // Create stream of tree nodes from the tree
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
+        DanGenH headerWalker = new DanGenH(nodes);
+        headerWalker.types = parser.types;
+        headerWalker.setTemplateLib(templates);
+        DanGenH.prog_return headerReturn = headerWalker.prog();
+
+        // Emit header
+        StringTemplate headerOutput = (StringTemplate)headerReturn.getTemplate();
+        // TODO emit a file
+        System.out.println(headerOutput.toString());
+        System.out.println("// end of header \n\n\n\n");
+
+        // Walk the AST to generate source
+        // Create stream of tree nodes from the tree
         DanGen walker = new DanGen(nodes);
         walker.types = parser.types;
         walker.setTemplateLib(templates);
         DanGen.prog_return r2 = walker.prog();
 
-        // Emit module
+        // Emit source
         StringTemplate output = (StringTemplate)r2.getTemplate();
         System.out.println(output.toString());
     }
