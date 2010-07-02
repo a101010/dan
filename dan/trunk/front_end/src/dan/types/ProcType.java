@@ -6,6 +6,7 @@
  */
 package dan.types;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.antlr.runtime.Token;
@@ -24,7 +25,7 @@ import org.antlr.runtime.Token;
 // TODO in the hazy distant future, procs may be able to have the modifier mobile 
 // but that may only work in the context of a bytecode system
 // 
-public class ProcType extends DanType {
+public class ProcType extends DanType implements Serializable {
 
     static public void ValidateName(Token t){
         if(t.getText().contains("."))

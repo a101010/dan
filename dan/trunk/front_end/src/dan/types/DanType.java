@@ -3,6 +3,7 @@ package dan.types;
 import java.util.ArrayList;
 import org.antlr.runtime.Token;
 import dan.system.*;
+import java.io.Serializable;
 import java.util.HashMap;
 
 // TODO need to figure out where to handle generic types
@@ -12,7 +13,7 @@ import java.util.HashMap;
  * 
  * @author Alan
  */
-public class DanType {
+public class DanType implements Serializable {
 
     static public void resolveType(TypeRef tRef, HashMap<String, DanType> typeMap){
         DanType resolvedType = tRef.getResolvedType();

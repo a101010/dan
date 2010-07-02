@@ -6,12 +6,12 @@
 
 package dan.types;
 
-import dan.system.NotImplementedException;
+import java.io.Serializable;
 import org.antlr.runtime.CommonToken;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class ChanRType extends DanType {
+public class ChanRType extends DanType implements Serializable {
 
     static public int ChanrTokenId = 0;
 

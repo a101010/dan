@@ -5,11 +5,12 @@
  */
 package dan.types;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import org.antlr.runtime.Token;
 
 // TODO consider chaning to PrimitiveType (only covers static fixed size builtin types)
-public class BuiltinType extends DanType {
+public class BuiltinType extends DanType implements Serializable {
 
     public enum Builtins {
 

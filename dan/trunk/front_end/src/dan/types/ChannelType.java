@@ -6,6 +6,7 @@
 package dan.types;
 
 import dan.system.NotImplementedException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.antlr.runtime.Token;
@@ -15,7 +16,7 @@ import org.antlr.runtime.CommonToken;
  * 
  * @author Alan
  */
-public class ChannelType extends DanType {
+public class ChannelType extends DanType implements Serializable {
 
     public enum ChanBehavior {
         block,      // when the channel is full, the writer must block

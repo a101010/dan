@@ -6,6 +6,7 @@
 
 package dan.types;
 
+import java.io.Serializable;
 import org.antlr.runtime.Token;
 import java.util.ArrayList;
 
@@ -13,7 +14,7 @@ import java.util.ArrayList;
  * Represents a Bundle end structure.
  * @author Alan
  */
-public class BundleEndType extends DanType {
+public class BundleEndType extends DanType implements Serializable {
     public enum Directions { Read, Write }
     
     public BundleEndType(Token t, Directions d){

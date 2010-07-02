@@ -6,6 +6,7 @@
 
 package dan.types;
 
+import java.io.Serializable;
 import org.antlr.runtime.Token;
 import java.util.ArrayList;
 
@@ -15,7 +16,7 @@ import java.util.ArrayList;
  * Type references are resolved after the first parsing pass.
  * @author Alan
  */
-public class TypeRef {
+public class TypeRef implements Serializable {
     
     protected Token token;
     protected ArrayList<TypeRef> genericArgs;

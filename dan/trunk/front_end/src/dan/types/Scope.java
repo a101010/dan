@@ -7,6 +7,7 @@
 
 package dan.types;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -14,7 +15,7 @@ import java.util.HashMap;
  * Represents a block scope in a ProcType.
  * @author Alan
  */
-public class Scope {
+public class Scope implements Serializable {
     // TODO can add a list of statements here also, if needed
     public final HashMap<String, Vardec> Symbols;
 
