@@ -7,6 +7,7 @@
 package dan.types;
 
 import dan.system.NotImplementedException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import org.antlr.runtime.Token;
 
@@ -14,7 +15,7 @@ import org.antlr.runtime.Token;
  *
  * @author Alan
  */
-public class ChanTypeRef extends TypeRef {
+public class ChanTypeRef extends TypeRef implements Serializable {
     protected ChannelType.ChanDepth chanDepth1;
     protected int chanDepth2;
     protected Token chanDepth3;

@@ -6,7 +6,7 @@
 
 package dan.types;
 
-import dan.system.NotImplementedException;
+import java.io.Serializable;
 import org.antlr.runtime.CommonToken;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,7 +15,7 @@ import java.util.HashMap;
  * Represents a channel writer end.
  * @author Alan
  */
-public class ChanWType extends DanType {
+public class ChanWType extends DanType implements Serializable {
     
     static public int ChanwTokenId = 0;
 

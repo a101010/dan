@@ -6,13 +6,14 @@
 
 package dan.types;
 
+import java.io.Serializable;
 import org.antlr.runtime.Token;
 
 /**
  * Represents a channel declaration
  * @author Alan
  */
-public class ChanDec {
+public class ChanDec implements Serializable {
     public final ChannelType ChanType;
     public final Token ChanName;
     public final Token ChanDir;

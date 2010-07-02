@@ -5,13 +5,14 @@
  */
 
 package dan.types;
+import java.io.Serializable;
 import org.antlr.runtime.Token;
 
 /**
  * Represents a variable declaration.
  * @author Alan
  */
-public class Vardec {
+public class Vardec implements Serializable {
     static public enum StgClass{
         Static,
         Local,
