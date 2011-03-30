@@ -25,7 +25,11 @@ public class DanProgTest {
         System.out.println("Starting dan in: " + workingDir.getCanonicalPath());
 
         //File inputFile = new File(args[0]);
-        ANTLRFileStream input = new ANTLRFileStream(args[0]);
+        // TODO error handling
+        String inputFileName = args[0];
+        String danExtension = ".dan";
+        String inputFileStem = inputFileName.substring(0, inputFileName.length() - danExtension.length());
+        ANTLRFileStream input = new ANTLRFileStream(inputFileName);
 
         //ANTLRInputStream input = new ANTLRInputStream(System.in);
 
@@ -89,13 +93,11 @@ public class DanProgTest {
         }
 
 
-        // Emit the typ map
-
-        // write the objects
+        // Emit the type map
         FileOutputStream f = null;
         try {
-            // TODO need to generate .danti with proper filename instead of 'output'
-            f = new FileOutputStream("output.danti");
+            String dantiFileName = inputFileStem + ".danti";
+            f = new FileOutputStream(dantiFileName);
             ObjectOutput s = null;
             s = new ObjectOutputStream(f);
             s.writeObject(parser.types);
@@ -105,26 +107,6 @@ public class DanProgTest {
             Logger.getLogger(DanProgTest.class.getName()).log(Level.SEVERE, null, ex);
         }
         
-    
-
-
-        // read the objects TODO remove; this is test code
-        HashMap<String, DanType> recoveredMap = null;
-        try{
-            FileInputStream in = new FileInputStream("output.danti");
-            ObjectInputStream rs = new ObjectInputStream(in);
-            recoveredMap = (HashMap<String, DanType>) rs.readObject();
-            System.out.println("type map has been deserialized");
-        } catch (Exception ex){
-            Logger.getLogger(DanProgTest.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-
-
-
-
-
-
         // load the template group file
         File groupFile = new File(installDir.getCanonicalPath(), "SingleThread.stg");
         FileReader groupFileR = new FileReader(groupFile);
@@ -139,17 +121,12 @@ public class DanProgTest {
         headerWalker.setTemplateLib(templates);
         DanGenH.prog_return headerReturn = headerWalker.prog();
 
-
-
-
-
-
-
         // Emit header
         StringTemplate headerOutput = (StringTemplate)headerReturn.getTemplate();
-        // TODO emit a file
-        System.out.println(headerOutput.toString());
-        System.out.println("// end of header \n\n\n\n");
+        String hFileName = inputFileStem + ".h";
+        FileWriter hWriter = new FileWriter(hFileName);
+        hWriter.write(headerOutput.toString());
+        hWriter.close();
 
         // Walk the AST to generate source
         // Create stream of tree nodes from the tree
@@ -160,7 +137,10 @@ public class DanProgTest {
         DanGen.prog_return r2 = walker.prog();
 
         // Emit source
+        String cFileName = inputFileStem + ".c";
         StringTemplate output = (StringTemplate)r2.getTemplate();
-        System.out.println(output.toString());
+        FileWriter cWriter = new FileWriter(cFileName);
+        cWriter.write(output.toString());
+        cWriter.close();
     }
 }
