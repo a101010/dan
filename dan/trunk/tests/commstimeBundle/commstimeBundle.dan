@@ -1,0 +1,106 @@
+// Copyright 2011, Alan Grover
+
+// This is a sample of prototype Danger implementing the infamous commstime program. It uses 
+// channel bundles rather than bare channels.
+
+// It simplifies commstime2.dan by leaving out conditional compilation and GetTimeNano,
+// and makes bundle end types a subtype of the bundle type.  It also dispenses with the 
+// bundle end extraction operator, making the ends of the bundle members of the bundle.
+
+import GetTimeNano from Time;
+
+bundle BInt
+{
+    channel<int32>(0) c ->;
+    // eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
+}
+
+proc void Delta(static BInt.Read in, static BInt.Write out1, static BInt.Write out2)
+{
+    int32 value;
+    while (true)
+    {        
+        in.c ? value;
+        out1.c ! value;
+        out2.c ! value;
+    }
+}
+            
+proc void Succ(static BInt.Read in, static BInt.Write out)
+{
+    int32 value;
+    while (true)
+    {
+        in.c ? value;
+        out.c ! value + 1;
+    }
+}
+        
+proc void Prefix(static BInt.Read in, static BInt.Write out, int32 initValue)
+{
+    int32 value = initValue;
+    out.c ! value;
+    while (true)
+    {
+        in.c ? value;
+        out.c ! value;
+    }
+}
+
+proc void Count(static BInt.Read in)
+{
+    int32 value;
+    int32 step = 100000;
+//    cif(debug)
+//    {
+//        int32 time; // in nanoseconds
+//    }
+    int32 iteration = 0;
+    while (iteration < 3)
+    {
+        int32 i = 0;
+//        cif(debug)
+//        {
+//            time = GetTimeNano();
+//        }
+        while (i < step)
+        {
+            in.c ? value;
+            i = i + 1;
+        }
+//        cif(debug)
+//        {
+//            time = GetTimeNano() - time;
+//            debug ! string.Format("Time for {0} iterations: {1} ns", step, time);
+//            debug ! string.Format("Time for 1 iteration: {0} ns", (float64) time / (float64) step);
+//        }
+        iteration = iteration + 1;
+    }
+}
+        
+        
+[main]
+proc void Commstime()
+{
+    // Statically allocated bundles are allocated in the locals
+    // space of the proc.
+    static BInt a = new(static) BInt();
+    static BInt b = new(static) BInt();
+    static BInt c = new(static) BInt();
+    static BInt d = new(static) BInt();
+    par
+    {
+        // For static bundles, the entire bundle end must be
+        // passed to other processes.  Individual channels may not
+        // be passed separately.
+        // In addition, bundle ends may only be passed to procs that are
+        // gauranteed to complete before the allocating proc.
+        // This means they must be in a par, and must declare
+        // the bundle end static in their parameter list.
+        // (These rules will also apply to statically allocated Mobile types)
+        Prefix(d.read, a.write, 0);
+        Delta(a.read, b.write, c.write);
+        Succ(c.read, d.write);
+        Count(b.read);
+    }
+}        

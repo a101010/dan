@@ -1,0 +1,16 @@
+// Copyright 2011, Alan Grover
+
+// Prefix outputs an initial value and then acts as a buffer.
+        
+import BInt;
+
+proc void Prefix(static BInt.Read in, static BInt.Write out, int32 initValue)
+{
+    int32 value = initValue;
+    out.c ! value;
+    while (true)
+    {
+        in.c ? value;
+        out.c ! value;
+    }
+}

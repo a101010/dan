@@ -1,0 +1,11 @@
+// Copyright 2011, Alan Grover
+
+// The BInt channel bundle has a single channel that can communicate int32's.
+
+
+bundle BInt
+{
+    channel<int32>(0) c ->;
+    // eventually we'll be able to include a protocol declaration for the bundle for channels that can take a sequence of types
+}
+
