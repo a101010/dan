@@ -1,0 +1,16 @@
+// Copyright 2011, Alan Grover
+
+// Delta copies the input to the two outputs.
+
+import BInt;
+
+proc void Delta(static BInt.Read in, static BInt.Write out1, static BInt.Write out2)
+{
+    int32 value;
+    while (true)
+    {        
+        in.c ? value;
+        out1.c ! value;
+        out2.c ! value;
+    }
+}

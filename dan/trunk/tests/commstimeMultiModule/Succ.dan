@@ -1,0 +1,15 @@
+// Copyright 2011, Alan Grover
+
+// Succ increments the input and then outputs it.
+
+import BInt;
+
+proc void Succ(static BInt.Read in, static BInt.Write out)
+{
+    int32 value;
+    while (true)
+    {
+        in.c ? value;
+        out.c ! value + 1;
+    }
+}

@@ -1,0 +1,40 @@
+// Copyright 2011, Alan Grover
+
+// This is a sample of prototype Danger implementing the infamous commstime program. It uses 
+// channel bundles rather than bare channels, and is broken into multiple simple modules.
+
+// It simplifies commstime2.dan by leaving out conditional compilation and GetTimeNano,
+// and makes bundle end types a subtype of the bundle type.  It also dispenses with the 
+// bundle end extraction operator, making the ends of the bundle members of the bundle.
+
+import BInt;
+import Delta;
+import Succ;
+import Prefix;
+import Count;
+        
+[main]
+proc void Commstime()
+{
+    // Statically allocated bundles are allocated in the locals
+    // space of the proc.
+    static BInt a = new(static) BInt();
+    static BInt b = new(static) BInt();
+    static BInt c = new(static) BInt();
+    static BInt d = new(static) BInt();
+    par
+    {
+        // For static bundles, the entire bundle end must be
+        // passed to other processes.  Individual channels may not
+        // be passed separately.
+        // In addition, bundle ends may only be passed to procs that are
+        // gauranteed to complete before the allocating proc.
+        // This means they must be in a par, and must declare
+        // the bundle end static in their parameter list.
+        // (These rules will also apply to statically allocated Mobile types)
+        Prefix(d.read, a.write, 0);
+        Delta(a.read, b.write, c.write);
+        Succ(c.read, d.write);
+        Count(b.read);
+    }
+}        
