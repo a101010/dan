@@ -9,6 +9,7 @@
 
 struct __c0bs32Type_tag __c0bs32Type = {0};
 
+
 void __c0bs32Type_init()
 {
     struct __c0bs32Type_tag *type =

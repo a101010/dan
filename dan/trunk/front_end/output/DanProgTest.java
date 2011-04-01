@@ -27,6 +27,9 @@ public class DanProgTest {
         //File inputFile = new File(args[0]);
         // TODO error handling
         String inputFileName = args[0];
+        System.out.println();
+        System.out.println("compiling " + inputFileName);
+        System.out.println();
         String danExtension = ".dan";
         String inputFileStem = inputFileName.substring(0, inputFileName.length() - danExtension.length());
         ANTLRFileStream input = new ANTLRFileStream(inputFileName);
@@ -45,7 +48,7 @@ public class DanProgTest {
 
         Tree t = (Tree) result.getTree();
 
-        System.out.println(t.toStringTree());
+        //System.out.println(t.toStringTree());
         RuleBasedCollator en_USCollator = (RuleBasedCollator)
             Collator.getInstance(new Locale("en", "US", ""));
 
@@ -56,7 +59,7 @@ public class DanProgTest {
             types += "\n" + typeName;
         }
         
-        System.out.println(types + "\n");
+        //System.out.println(types + "\n");
         
         System.out.println("Number of errors: " + parser.errorCount);
 
@@ -73,9 +76,9 @@ public class DanProgTest {
                 if(resolvedType == null){
                     throw new RuntimeException("unresolved typeref: " + tRef.getLongName());
                 }
-                else {
-                    System.out.println("type " + tRef.getLongName() + " resolved as " + resolvedType.getEmittedType());
-                }
+                //else {
+                //    System.out.println("type " + tRef.getLongName() + " resolved as " + resolvedType.getEmittedType());
+                //}
             }
         }
 
@@ -86,9 +89,9 @@ public class DanProgTest {
                 if(resolvedType == null){
                     throw new RuntimeException("unresolved typeref: " + tRef.getLongName());
                 }
-                else {
-                    System.out.println("type " + tRef.getLongName() + " resolved as " + resolvedType.getEmittedType());
-                }
+                //else {
+                //    System.out.println("type " + tRef.getLongName() + " resolved as " + resolvedType.getEmittedType());
+                //}
             }
         }
 
@@ -118,6 +121,7 @@ public class DanProgTest {
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
         DanGenH headerWalker = new DanGenH(nodes);
         headerWalker.types = parser.types;
+        headerWalker.includeGuard = inputFileStem.toUpperCase() + "_H_";
         headerWalker.setTemplateLib(templates);
         DanGenH.prog_return headerReturn = headerWalker.prog();
 
@@ -133,6 +137,7 @@ public class DanProgTest {
         nodes = new CommonTreeNodeStream(t);
         DanGen walker = new DanGen(nodes);
         walker.types = parser.types;
+        walker.inputFileStem = inputFileStem;
         walker.setTemplateLib(templates);
         DanGen.prog_return r2 = walker.prog();
 

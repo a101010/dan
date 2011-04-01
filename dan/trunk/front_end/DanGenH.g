@@ -21,13 +21,15 @@ import dan.system.*;
 @members 
 {
 public HashMap<String, DanType> types;
+public String includeGuard;
 
 // for assignment statements and vardec statements with an initializer, 
 // represents the target of the assignment
 public String assignTarget = null;
 }
 
-prog		: imports decs -> danHeader(frontMatter={"// TODO frontmatter"},
+prog		: imports decs -> danHeader(includeGuard={includeGuard},
+					    frontMatter={"// TODO frontmatter"},
 					    imports={$imports.st}, 
 					    decs={$decs.st});
 
@@ -203,20 +205,20 @@ procDec 	scope
 					               );
 			
 			// TODO add check for duplicate main (not here... have to check across all libraries and modules)
-			boolean isMain = false;
-			for(String s: type.Attributes){
-				if(s.equals("main")){
-					isMain = true;
-					break;
-				}
-			}
+			//boolean isMain = false;
+			//for(String s: type.Attributes){
+			//	if(s.equals("main")){
+			//		isMain = true;
+			//		break;
+			//	}
+			//}
 			
-			if(!isMain){
+			//if(!isMain){
 				retval.st = procDecTemplate;
-			}
-			else {
-				retval.st = new StringTemplate("// Don't need a [main] proc in the header TODO verify");
-			}
+			//}
+			//else {
+			//	retval.st = new StringTemplate("// Don't need a [main] proc in the header TODO verify");
+			//}
 			
 		};
 
@@ -226,13 +228,13 @@ genericArgList	: ^(GENERIC_ARGLIST tIds+=typeId+);
 	
 chanTypeId  	: ^('channel' /*genericArgList channelArgs*/ CT_REF)
 		{
-			System.out.println("got a chanTypeId with attached longname: " + $CT_REF.text);
+			//System.out.println("got a chanTypeId with attached longname: " + $CT_REF.text);
 		};
 
-typeId		: SIMPLE_TYPE ID T_REF { System.out.println("DanGen: type is " + $T_REF.text); } -> typeId(id={$ID})
-		| 'chanr' genericArgList T_REF { System.out.println("DanGen: type is " + $T_REF.text); }
-		| 'chanw' genericArgList T_REF { System.out.println("DanGen: type is " + $T_REF.text); }
-		| GENERIC_TYPE ID genericArgList T_REF {System.out.println("type is " + $T_REF.text); }; 
+typeId		: SIMPLE_TYPE ID T_REF { /*System.out.println("DanGenH: type is " + $T_REF.text);*/ } -> typeId(id={$ID})
+		| 'chanr' genericArgList T_REF { /*System.out.println("DanGenH: type is " + $T_REF.text); */}
+		| 'chanw' genericArgList T_REF { /*System.out.println("DanGenH: type is " + $T_REF.text); */ }
+		| GENERIC_TYPE ID genericArgList T_REF {/*System.out.println("type is " + $T_REF.text); */ }; 
 		
 paramStorageClass
 	:	'static' | 'mobile';
