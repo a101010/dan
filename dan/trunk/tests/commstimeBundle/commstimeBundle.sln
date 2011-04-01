@@ -2,6 +2,9 @@
 Microsoft Visual Studio Solution File, Format Version 10.00
 # Visual C++ Express 2008
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "commstimeBundle", "commstimeBundle.vcproj", "{4B9D37FA-7FE8-46EA-AB08-5FF23DA6C631}"
+	ProjectSection(ProjectDependencies) = postProject
+		{792C7675-0AE4-4103-B61B-18649FD61C57} = {792C7675-0AE4-4103-B61B-18649FD61C57}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SingleThreadRuntime", "..\..\runtime\sthread\SingleThreadRuntime.vcproj", "{792C7675-0AE4-4103-B61B-18649FD61C57}"
 EndProject

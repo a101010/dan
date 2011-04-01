@@ -70,29 +70,6 @@ simpleBundleDec(bundleType,
 // ----------------------------------------------
 // <bundleType> channel bundle type
 
-typedef struct BundleR_<bundleType>_tag
-{
-    <readEnds>
-} BundleR_<bundleType>;
-
-typedef struct BundleW_<bundleType>_tag
-{
-    <writeEnds>
-} BundleW_<bundleType>;
-
-// backing store for <bundleType> channel bundle
-typedef struct Bundle_<bundleType>_tag
-{
-
-    BundleR_<bundleType>   *read;
-    BundleW_<bundleType>   *write;
-    BundleR_<bundleType>   readStore;
-    BundleW_<bundleType>   writeStore;
-    <channelDeclarations>
-} Bundle_<bundleType>;
-
-
-
 // <bundleType>_chans constructor
 Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans)
 {
