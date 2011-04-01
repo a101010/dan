@@ -20,13 +20,15 @@ import dan.system.*;
 @members 
 {
 public HashMap<String, DanType> types;
+public String inputFileStem;
 
 // for assignment statements and vardec statements with an initializer, 
 // represents the target of the assignment
 public String assignTarget = null;
 }
 
-prog		: imports decs -> danModule(frontMatter={"// TODO frontmatter"},
+prog		: imports decs -> danModule(sourceFileName={inputFileStem},
+					    frontMatter={"// TODO frontmatter"},
 					    imports={$imports.st}, 
 					    decs={$decs.st});
 
@@ -245,7 +247,7 @@ procDec 	scope
 			}
 			
 			if(isMain){
-				retval.st = templateLib.getInstanceOf("main",
+				retval.st = templateLib.getInstanceOf("mainProc",
 					new STAttrMap().put("mainProcDec", procDecTemplate)
 					               .put("mainProcName", type.getName())
 					               );
@@ -260,13 +262,13 @@ genericArgList	: ^(GENERIC_ARGLIST tIds+=typeId+);
 	
 chanTypeId  	: ^('channel' /*genericArgList channelArgs*/ CT_REF)
 		{
-			System.out.println("got a chanTypeId with attached longname: " + $CT_REF.text);
+			//System.out.println("got a chanTypeId with attached longname: " + $CT_REF.text);
 		};
 
-typeId		: SIMPLE_TYPE ID T_REF { System.out.println("DanGen: type is " + $T_REF.text); } -> typeId(id={$ID})
-		| 'chanr' genericArgList T_REF { System.out.println("DanGen: type is " + $T_REF.text); }
-		| 'chanw' genericArgList T_REF { System.out.println("DanGen: type is " + $T_REF.text); }
-		| GENERIC_TYPE ID genericArgList T_REF {System.out.println("type is " + $T_REF.text); }; 
+typeId		: SIMPLE_TYPE ID T_REF {/* System.out.println("DanGen: type is " + $T_REF.text); */ } -> typeId(id={$ID})
+		| 'chanr' genericArgList T_REF { /*System.out.println("DanGen: type is " + $T_REF.text);*/ }
+		| 'chanw' genericArgList T_REF { /*System.out.println("DanGen: type is " + $T_REF.text); */}
+		| GENERIC_TYPE ID genericArgList T_REF {/*System.out.println("type is " + $T_REF.text);*/ }; 
 		
 paramStorageClass
 	:	'static' | 'mobile';
@@ -473,7 +475,7 @@ pool		returns [String poolName]
 
 constructor	: ^(CONSTRUCTOR pool typeId argList[true]) 
 		{
-			System.out.println("made it");
+			//System.out.println("made it");
 			// TODO need to deal with constructors in arbitrary expressions, not just as
 			// the sole expression of an assignStmt or varDecStmt
 			//String poolStr = $pool.st.toString();

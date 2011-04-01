@@ -1,12 +1,13 @@
 group SingleThread;
 
-danModule(frontMatter, imports, decs) ::= <<
+danModule(sourceFileName, frontMatter, imports, decs) ::= <<
 // C file generated from Danger source code by the dan compiler
 <frontMatter>
 
 #include \<stdio.h\> // TODO write string, logging, and io libs for Danger
 #include \<time.h\>  // TODO write a time lib for Danger
 #include \<__struntime.h\>
+#include "<sourceFileName>.h"
 
 // ---------------------------------------
 // I m p o r t s
@@ -20,10 +21,11 @@ danModule(frontMatter, imports, decs) ::= <<
 <decs>
 >>
 
-danHeader(frontMatter, imports, decs) ::= <<
+danHeader(includeGuard, frontMatter, imports, decs) ::= <<
 // C header file generated from Danger source code by the dan compiler
 <frontMatter>
-
+#ifndef <includeGuard>
+#define <includeGuard>
 #include \<__struntime.h\>
 
 // ---------------------------------------
@@ -36,6 +38,7 @@ danHeader(frontMatter, imports, decs) ::= <<
 // ---------------------------------------
 
 <decs>
+#endif // <includeGuard>
 >>
 
 importStmt(library, symbol) ::= <<
@@ -166,16 +169,6 @@ procDec(procType,
         cleanup) ::= <<
 // ----------------------------------------------
 // <procType> PROC type
-typedef struct <procType>_locals_tag
-{
-    <locals>
-} <procType>_locals;
-
-typedef struct <procType>_proc_tag
-{
-    proc                        p;
-    <procType>_locals           locals;
-} <procType>_proc;
 
 // <procType>_locals constructor
 <procType>_locals * <procType>_locals_ctor(<params; separator=", ">)
