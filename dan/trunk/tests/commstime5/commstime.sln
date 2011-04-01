@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual C++ Express 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "commstime", "commstime.vcproj", "{3CF9FCEF-F003-43DA-9BC0-66B92CC381EA}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SingleThreadRuntime", "..\..\runtime\sthread\SingleThreadRuntime.vcproj", "{792C7675-0AE4-4103-B61B-18649FD61C57}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3CF9FCEF-F003-43DA-9BC0-66B92CC381EA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3CF9FCEF-F003-43DA-9BC0-66B92CC381EA}.Debug|Win32.Build.0 = Debug|Win32
+		{3CF9FCEF-F003-43DA-9BC0-66B92CC381EA}.Release|Win32.ActiveCfg = Release|Win32
+		{3CF9FCEF-F003-43DA-9BC0-66B92CC381EA}.Release|Win32.Build.0 = Release|Win32
+		{792C7675-0AE4-4103-B61B-18649FD61C57}.Debug|Win32.ActiveCfg = Debug|Win32
+		{792C7675-0AE4-4103-B61B-18649FD61C57}.Debug|Win32.Build.0 = Debug|Win32
+		{792C7675-0AE4-4103-B61B-18649FD61C57}.Release|Win32.ActiveCfg = Release|Win32
+		{792C7675-0AE4-4103-B61B-18649FD61C57}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
