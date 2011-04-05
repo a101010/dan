@@ -21,6 +21,10 @@ danModule(sourceFileName, frontMatter, imports, decs) ::= <<
 <decs>
 >>
 
+imports(importStatements) ::= <<
+<importStatements>
+>>
+
 danHeader(includeGuard, frontMatter, imports, decs) ::= <<
 // C header file generated from Danger source code by the dan compiler
 <frontMatter>
