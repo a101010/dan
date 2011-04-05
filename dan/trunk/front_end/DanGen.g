@@ -33,7 +33,7 @@ prog		: imports decs -> danModule(sourceFileName={inputFileStem},
 					    decs={$decs.st});
 
 
-imports 	: ^(IMPORTS (imp+=importStmt)*) -> template(imports={$imp}) "<imports>";
+imports 	: ^(IMPORTS (imp+=importStmt)*) -> imports(importStatements={$imp});
     
 importStmt 	: ^('import' library=ID symbol=ID) 
 			-> importStmt(library={$library.text}, symbol={$symbol.text})
