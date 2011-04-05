@@ -27,18 +27,9 @@ public String inputFileStem;
 public String assignTarget = null;
 }
 
-prog		: imports decs -> danModule(sourceFileName={inputFileStem},
+prog		: decs -> danModule(sourceFileName={inputFileStem},
 					    frontMatter={"// TODO frontmatter"},
-					    imports={$imports.st}, 
 					    decs={$decs.st});
-
-
-imports 	: ^(IMPORTS (imp+=importStmt)*) -> imports(importStatements={$imp});
-    
-importStmt 	: ^('import' library=ID symbol=ID) 
-			-> importStmt(library={$library.text}, symbol={$symbol.text})
-		| ^('import' library=ID ALL)
-			-> importStmt(library={$library.text}, symbol={$ALL.text});
 		
 decs 		: (d+=declaration)+ -> template(decs={$d}) "<decs>";
    

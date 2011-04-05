@@ -20,6 +20,7 @@ import dan.system.*;
 
 @members 
 {
+public StringTemplate importLibs;
 public HashMap<String, DanType> types;
 public String includeGuard;
 
@@ -28,18 +29,11 @@ public String includeGuard;
 public String assignTarget = null;
 }
 
-prog		: imports decs -> danHeader(includeGuard={includeGuard},
+prog		: decs -> danHeader(includeGuard={includeGuard},
 					    frontMatter={"// TODO frontmatter"},
-					    imports={$imports.st}, 
+					    imports={importLibs}, 
 					    decs={$decs.st});
 
-
-imports 	: ^(IMPORTS (imp+=importStmt)*) -> imports(importStatements={$imp});
-    
-importStmt 	: ^('import' library=ID symbol=ID) 
-			-> importStmt(library={$library.text}, symbol={$symbol.text})
-		| ^('import' library=ID ALL)
-			-> importStmt(library={$library.text}, symbol={$ALL.text});
 		
 decs 		: (d+=declaration)+ -> template(decs={$d}) "<decs>";
    

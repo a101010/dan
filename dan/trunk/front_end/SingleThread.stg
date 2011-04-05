@@ -1,6 +1,6 @@
 group SingleThread;
 
-danModule(sourceFileName, frontMatter, imports, decs) ::= <<
+danModule(sourceFileName, frontMatter, decs) ::= <<
 // C file generated from Danger source code by the dan compiler
 <frontMatter>
 
@@ -8,11 +8,6 @@ danModule(sourceFileName, frontMatter, imports, decs) ::= <<
 #include \<time.h\>  // TODO write a time lib for Danger
 #include \<__struntime.h\>
 #include "<sourceFileName>.h"
-
-// ---------------------------------------
-// I m p o r t s
-// ---------------------------------------
-<imports>
 
 // ---------------------------------------
 // D e c l a r a t i o n s
@@ -45,9 +40,8 @@ danHeader(includeGuard, frontMatter, imports, decs) ::= <<
 #endif // <includeGuard>
 >>
 
-importStmt(library, symbol) ::= <<
-// import: library= <library> symbol= <symbol>
-
+importStmt(library) ::= <<
+#include "<library>.h"
 >>
 
 attrib(attribId) ::= <<

@@ -67,6 +67,39 @@ public class DanProgTest {
             System.exit(parser.errorCount);
         }
 
+        // TODO everything after this should be moved to back_end
+
+        // get imported libraries
+        // remove duplicate library names
+        ArrayList<String> importLibs = new ArrayList<String>();
+        for(String libName : parser.importLibs){
+            boolean foundDup = false;
+            for(String dupName : importLibs){
+                if(libName.equals(dupName)){
+                    foundDup = true;
+                    break;
+                }
+            }
+            if(!foundDup){
+                importLibs.add(libName);
+            }
+        }
+
+        // get the type map from each imported library
+        for(String libName : importLibs){
+            HashMap<String, DanType> recoveredMap = null;
+            try{
+                // TODO use search path before the current dir
+                // TODO add a bit of error checking
+                FileInputStream in = new FileInputStream(libName + ".danti");
+                ObjectInputStream rs = new ObjectInputStream(in);
+                recoveredMap = (HashMap<String, DanType>) rs.readObject();
+                parser.types.putAll(recoveredMap);
+            } catch (Exception ex){
+                Logger.getLogger(DanProgTest.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        
         // resolve types
 
         for(ArrayList<TypeRef> tRefs: parser.typeRefs.values()){
@@ -97,6 +130,8 @@ public class DanProgTest {
 
 
         // Emit the type map
+        // TODO we want to only emit the type map for the .dan file we compiled
+        //      right now this also includes all library types
         FileOutputStream f = null;
         try {
             String dantiFileName = inputFileStem + ".danti";
