@@ -59,6 +59,7 @@ import dan.system.*;
 
 @members 
 {
+	public ArrayList<String> importLibs = new ArrayList<String>();
 	public HashMap<String, DanType> types = new HashMap<String, DanType>();
 	public HashMap<String, ArrayList<TypeRef>> typeRefs = new HashMap<String, ArrayList<TypeRef>>();
 	
@@ -84,12 +85,21 @@ prog		scope TypeIdScope; // so there will always be a TypeIdScope for typeId to 
 		: imports decs;
 
 
-imports 	: importStmt* -> ^(IMPORTS importStmt*);
+imports 	: importStmt*;
     
 // TODO could probably import a list of symbols from a library
-importStmt 	: 'import' ID STMT_END -> ^('import' ID ALL)
-			| 'import' symbol=ID 'from' library=ID STMT_END 
-				-> ^('import' $library $symbol);
+// TODO for the C back end, we can only emit #includes, and cannot prevent a symbol from being included
+//      for an asm back end, we could take care of that
+//      But for now, import will wind up having the same scope as #include
+//	The alternative is to generate a separate .h for each symbol, which sounds hard to manage
+importStmt 	: 'import' ID STMT_END 
+		{
+			importLibs.add($ID.text);
+		}	
+		| 'import' symbol=ID 'from' library=ID STMT_END 
+		{
+			importLibs.add($library.text);
+		};
 	
 	
 decs 		: declaration+;
