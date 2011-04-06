@@ -10,6 +10,7 @@ procs in pars
 0.1 - complete
 
 module linking/libraries
+bare channels (i.e. channels not in bundles)
 proc calls outside par
 tail recursive proc calls
 unsafe C calls
@@ -84,7 +85,7 @@ Testing, testing, 1, 2, 3, testing.
 1.0
 
 
-explicitly deffered to 2.0
+explicitly deferred to 2.0
 
 performance
 application binary interface
