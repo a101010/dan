@@ -82,7 +82,7 @@ prog		scope TypeIdScope; // so there will always be a TypeIdScope for typeId to 
 		{
 			$TypeIdScope::typeRefs = new ArrayList<TypeRef>();
 		}
-		: imports decs;
+		: imports decs -> decs;
 
 
 imports 	: importStmt*;

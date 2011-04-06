@@ -41,6 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="&quot;C:\Documents and Settings\Alan\My Documents\Alan\osource\dan\dan\trunk\runtime\sthread\source&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -170,12 +171,60 @@
 			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
+			<File
+				RelativePath=".\BInt.c"
+				>
+			</File>
+			<File
+				RelativePath=".\Commstime.c"
+				>
+			</File>
+			<File
+				RelativePath=".\Count.c"
+				>
+			</File>
+			<File
+				RelativePath=".\Delta.c"
+				>
+			</File>
+			<File
+				RelativePath=".\prefix.c"
+				>
+			</File>
+			<File
+				RelativePath=".\Succ.c"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\BInt.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Commstime.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Count.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Delta.h"
+				>
+			</File>
+			<File
+				RelativePath=".\prefix.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Succ.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"

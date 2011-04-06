@@ -7,7 +7,7 @@
 // and makes bundle end types a subtype of the bundle type.  It also dispenses with the 
 // bundle end extraction operator, making the ends of the bundle members of the bundle.
 
-import GetTimeNano from Time;
+// import GetTimeNano from Time;
 
 bundle BInt
 {

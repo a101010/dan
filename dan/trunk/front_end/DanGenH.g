@@ -20,7 +20,7 @@ import dan.system.*;
 
 @members 
 {
-public StringTemplate importLibs;
+public ArrayList<StringTemplate> importLibs;
 public HashMap<String, DanType> types;
 public String includeGuard;
 
