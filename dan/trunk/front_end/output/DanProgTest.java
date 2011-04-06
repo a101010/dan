@@ -10,6 +10,7 @@ import java.text.RuleBasedCollator;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.antlr.stringtemplate.language.DefaultTemplateLexer;
 
 /**
  * 
@@ -151,11 +152,18 @@ public class DanProgTest {
         StringTemplateGroup templates = new StringTemplateGroup(groupFileR);
         groupFileR.close();
 
+        ArrayList<StringTemplate> imports = new ArrayList<StringTemplate>();
+        for(String libName : importLibs){
+            StringTemplate st = templates.getInstanceOf("include", new STAttrMap().put("fileStem", libName));
+            imports.add(st);
+        }
+
         // Walk the AST to generate header
         // Create stream of tree nodes from the tree
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
         DanGenH headerWalker = new DanGenH(nodes);
         headerWalker.types = parser.types;
+        headerWalker.importLibs = imports;
         headerWalker.includeGuard = inputFileStem.toUpperCase() + "_H_";
         headerWalker.setTemplateLib(templates);
         DanGenH.prog_return headerReturn = headerWalker.prog();
@@ -182,5 +190,19 @@ public class DanProgTest {
         FileWriter cWriter = new FileWriter(cFileName);
         cWriter.write(output.toString());
         cWriter.close();
+    }
+
+    /** allows convenient multi-value initialization:
+     *  "new STAttrMap().put(...).put(...)"
+     */
+    public static class STAttrMap extends HashMap {
+      public STAttrMap put(String attrName, Object value) {
+        super.put(attrName, value);
+        return this;
+      }
+      public STAttrMap put(String attrName, int value) {
+        super.put(attrName, new Integer(value));
+        return this;
+      }
     }
 }

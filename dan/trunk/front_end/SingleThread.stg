@@ -20,6 +20,11 @@ imports(importStatements) ::= <<
 <importStatements>
 >>
 
+include(fileStem) ::= <<
+#include "<fileStem>.h"
+
+>>
+
 danHeader(includeGuard, frontMatter, imports, decs) ::= <<
 // C header file generated from Danger source code by the dan compiler
 <frontMatter>

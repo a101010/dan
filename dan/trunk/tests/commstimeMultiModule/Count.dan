@@ -3,7 +3,7 @@
 // Count times the rate at which it can consume inputs.
 
 import BInt;
-import GetTimeNano from Time;
+//import GetTimeNano from Time;
 
 proc void Count(static BInt.Read in)
 {
