@@ -17,6 +17,7 @@ unsafe C calls
 
 1st unit tests
 compiler error handling
+expression type checking
 
 0.2
 
@@ -24,7 +25,7 @@ alt
 timeouts
 skip
 strings basic
-invariant objects
+invariant objects (including adding methods to any type)
 dynamic memory
 recursive procs
 exceptions

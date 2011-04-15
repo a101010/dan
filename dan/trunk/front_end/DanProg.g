@@ -286,6 +286,10 @@ procDec 	scope
 				++errorCount;
 			} 
 			else {
+				// add parameters to currentScope
+				for(Vardec param : $procDec::params){
+					$procDec::currentScope.Symbols.put(param.EmittedName, param);
+				}
 				ProcType procType = new ProcType($pname, $typeId.t, $declaration::attributes, $procDec::params, $procDec::locals, $procDec::currentScope);
 				types.put(procType.getName(), procType);	
 			}

@@ -6,11 +6,15 @@
 package dan.types;
 
 import dan.system.NotImplementedException;
+import dan.system.TemplateGroupManager;
+import dan.system.STAttrMap;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
+import org.antlr.stringtemplate.StringTemplate;
+import org.antlr.stringtemplate.StringTemplateGroup;
 
 /**
  * 
@@ -216,5 +220,21 @@ public class ChannelType extends DanType implements Serializable {
     @Override
     public String getEmittedType(){
         return emittedTypeRep;
+    }
+
+    @Override
+    public StringTemplate getMemberWithCast(String symbol, String[] member){
+        if(member.length == 1){
+            if(member[0].equals("read") || member[0].equals("write")){
+                StringTemplateGroup templateLib = TemplateGroupManager.getTemplateLib();
+                StringTemplate st = templateLib.getInstanceOf("cast", 
+                        new STAttrMap().put("symbol", symbol)
+                                        .put("type", "__Channel32")
+                                        .put("member", member[0]));
+                return st;
+            }
+            throw new UnknownMemberException(symbol, member[0]);
+        }
+        throw new IllegalArgumentException("expecting one member to lookup");
     }
 }

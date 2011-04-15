@@ -128,12 +128,17 @@ Bundle_<bundleType> * Bundle_<bundleType>_ctor(Bundle_<bundleType> * chans);
 
 >>
 
-channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
+channelConstructorCallBundle(chanType, chanName, readEndId, writeEndId) ::= <<
 <chanType>_ctor( &(chans-><chanName>), <readEndId>, <writeEndId>);
 chans->readStore.<chanName> = chans-><chanName>.ends.read;
 chans-><chanName>.ends.read = 0; // because it is a mobile type
 chans->writeStore.<chanName> = chans-><chanName>.ends.write;
 chans-><chanName>.ends.write = 0;
+>>
+
+channelConstructorCall(chanType, chanName, readEndId, writeEndId) ::= <<
+<chanType>_ctor( &(locals-><chanName>), <readEndId>, <writeEndId>);
+
 >>
 
 instanceParam(procType) ::= <<
@@ -544,4 +549,8 @@ int main()
     return ret_val;
 }
 
+>>
+
+cast(symbol, type, member) ::= <<
+((<type>)<symbol>).<member>
 >>
