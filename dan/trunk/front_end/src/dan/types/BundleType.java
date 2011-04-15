@@ -6,10 +6,11 @@
  */
 package dan.types;
 
+import dan.system.NotImplementedException;
 import java.util.ArrayList;
 import org.antlr.runtime.Token;
-import dan.system.*;
 import java.io.Serializable;
+import org.antlr.stringtemplate.StringTemplate;
 
 // Bundles produce a plethora of types.
 // Each bundle end has a type, each channel in the bundle
@@ -61,11 +62,11 @@ public class BundleType extends DanType implements Serializable {
     @Override
     public DanType getMemberType(String[] splitId){
         BundleEndType member = null;
-        if(splitId[0].equals("Read")){
+        if(splitId[0].equals("read")){
             
             member = Reader;
         }
-        else if(splitId[0].equals("Write")){
+        else if(splitId[0].equals("write")){
             member = Writer;
         }
         
@@ -75,6 +76,22 @@ public class BundleType extends DanType implements Serializable {
     @Override
     public String getEmittedType(){
         return "Bundle_" + getName();
+    }
+
+    @Override
+    public StringTemplate getMemberWithCast(String symbol, String[] member){
+        if(member.length < 1){
+            throw new IllegalArgumentException("member[] must have at least one String");
+        }
+        if(member[0].equals("read") || member[0].equals("write")){
+            if(member.length > 1){
+                throw new NotImplementedException();
+            }
+            return new StringTemplate(symbol + "." + member[0]);
+        }
+        else{
+            throw new UnknownMemberException(symbol, member[0]);
+        }
     }
     
 }

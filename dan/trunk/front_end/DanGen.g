@@ -86,7 +86,7 @@ bundleStmt	: ^(BUNDLE_STATEMENT channelDecStmt1 channelDir)
 			$bundleDec::channelDeclarations.add(templateLib.getInstanceOf("localValueDec",
 					new STAttrMap().put("type", "__c0bs32")
 					               .put("name", name)));
-			$bundleDec::channelConstructors.add(templateLib.getInstanceOf("channelConstructorCall",
+			$bundleDec::channelConstructors.add(templateLib.getInstanceOf("channelConstructorCallBundle",
 					new STAttrMap().put("chanType", "__c0bs32")
 					               .put("chanName", name)
 					               .put("readEndId", "\"readEndId\"")
@@ -118,8 +118,17 @@ channelDecStmt1	returns [String name]
 			$name = $ID.text;
 		};
 		
-channelDecStmt2 
-	:	 ^(CHAN_VARDEC_2 paramStorageClass chanTypeId ID);
+channelDecStmt2 : ^(CHAN_VARDEC_2 paramStorageClass chanTypeId name=ID)
+		{
+			// TODO use chanTypeId to get channel type
+			retval.st = templateLib.getInstanceOf("channelConstructorCall",
+					new STAttrMap().put("chanType", "__c0bs32")
+					               .put("chanName", $name)
+					               .put("readEndId", "\"readEndId\"")
+					               .put("writeEndId", "\"writeEndId\""));
+				         
+
+		};
 		
 	
 channelDir 	returns [boolean forward]
@@ -147,6 +156,8 @@ procDec 	scope
 			boolean hasPar;
 			// labelNum is for saveState labels
 			int labelNum;
+			
+			Scope currentScope;
 		}
 		@init
 		{
@@ -163,6 +174,7 @@ procDec 	scope
 			$procDec::hasIo = false;
 			$procDec::hasPar = false;
 			$procDec::labelNum = 0;
+			$procDec::currentScope = null; // this is initialized in the first block of the proc
 		}
 		: ^('proc' returnType=ID name=ID 
 		{ 
@@ -296,7 +308,7 @@ statement 	: whileStmt { $statement.st = $whileStmt.st; }
 
 simpleStatement 
 		: varDecStmt { $simpleStatement.st = $varDecStmt.st; }
-			| channelDecStmt2 -> template(chanDec={"// chanDecStmt2\n"}) "<chanDec>"
+			| channelDecStmt2 {$simpleStatement.st = $channelDecStmt2.st; }
 			| sendStmt { $simpleStatement.st = $sendStmt.st; }
 			| receiveStmt { $simpleStatement.st = $receiveStmt.st; }
 			| assignStmt { $simpleStatement.st = $assignStmt.st; }
@@ -307,10 +319,25 @@ block 		[boolean isPar]
 		scope
 		{
 			boolean isInPar;
+			
 		}
 		@init 
 		{
 			$block::isInPar = false;
+			if($procDec::currentScope == null){
+				//System.out.println("entering first block, setting currentScope to RootScope");
+				$procDec::currentScope = $procDec::type.RootScope;
+			} 
+			else {
+				//System.out.println("entering block, setting currentScope to first unvisited child");
+				for(Scope childScope : $procDec::currentScope.Children) {
+					if(childScope.IsVisited != true){
+						$procDec::currentScope = childScope;
+						$procDec::currentScope.IsVisited = true;
+						break;
+					}
+				}
+			}
 		}
 		: ^(BLOCK  
 		{ 
@@ -319,8 +346,20 @@ block 		[boolean isPar]
 				// nested block) and needs to be launched as a proc
 				// not currently supported
 			}
-			$block::isInPar = $isPar; /* so the scope variable is only true for the par's block, not nested blocks */ 
-		} statements+=statement+) -> template(statements={$statements}) "<statements>";
+			$block::isInPar = $isPar; // so the scope variable is only true for the par's block, not nested blocks 
+			
+			
+			
+		} statements+=statement+ {
+			if($procDec::currentScope.Parent != null){
+				//System.out.println("leaving block, setting currentScope to parent");
+				$procDec::currentScope = $procDec::currentScope.Parent;
+			}
+			else {
+				$procDec::currentScope = null;
+				//System.out.println("leaving block, setting currentScope to null");
+			}
+		}) -> template(statements={$statements}) "<statements>";
 
 whileStmt 	: ^('while' exp block[false]) -> whileStatement(condition={$exp.st}, statements={$block.st});
 
@@ -433,8 +472,16 @@ returnStmt	: ^('return' exp);
 
 
 exp	 	: literal { $exp.st = $literal.st; }
-		| ID  -> template(id={$ID.text}) "locals-><id>"
-		| constructor -> { $exp.st = $constructor.st; }
+		| ID  
+		{
+			// If ID is a compound ID, e.g. foo.bar.baz, we need to start with foo and see if it is in scope.
+			// Then we can check whether it also has a member 'bar', etc.
+			// We check the current scope and then all parent scopes
+			$exp.st = new StringTemplate($procDec::currentScope.GetEmittedName($ID.getToken()));
+			
+			
+		}
+		| constructor -> { $exp.st = $constructor.st; } 
 		| call[false]  { $exp.st = $call.st; }
 		| ^('<' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={"<"})
 		| ^('>' left=exp right=exp) -> binaryOp(left={$left.st}, right={$right.st}, op={">"})
@@ -499,6 +546,7 @@ constructor	: ^(CONSTRUCTOR pool typeId argList[true])
 call		[boolean isStatement]
 		: ^(CALL ID argList[false])
 		{
+			// TODO if ID is compound, e.g. foo.bar().baz(), have to check if foo is in scope; c.f. ID expression
 			if(isStatement){
 				if($block::isInPar){
 					StringTemplate procConstructor = templateLib.getInstanceOf("procConstructor",

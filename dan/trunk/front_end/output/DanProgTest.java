@@ -1,4 +1,5 @@
 
+import dan.system.TemplateGroupManager;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
 import org.antlr.stringtemplate.*;
@@ -151,7 +152,9 @@ public class DanProgTest {
         FileReader groupFileR = new FileReader(groupFile);
         StringTemplateGroup templates = new StringTemplateGroup(groupFileR);
         groupFileR.close();
+        TemplateGroupManager.setTemplateLib(templates);
 
+        // create the list of libraries included
         ArrayList<StringTemplate> imports = new ArrayList<StringTemplate>();
         for(String libName : importLibs){
             StringTemplate st = templates.getInstanceOf("include", new STAttrMap().put("fileStem", libName));

@@ -10,7 +10,7 @@ proc void Delta(static chanr<int32> in, static chanw<int32> out1, static chanw<i
 {
     int32 value;
     while (true)
-    {        
+    {   
         in ? value;
         out1 ! value;
         out2 ! value;

@@ -5,6 +5,7 @@ import org.antlr.runtime.Token;
 import dan.system.*;
 import java.io.Serializable;
 import java.util.HashMap;
+import org.antlr.stringtemplate.StringTemplate;
 
 // TODO need to figure out where to handle generic types
 // It may need to be in DanType, since protocols and channels
@@ -88,6 +89,8 @@ public class DanType implements Serializable {
         }
     }
 
+
+
     protected String name;
     protected String longName;
     protected Token token;
@@ -169,6 +172,20 @@ public class DanType implements Serializable {
     // in bits
     public int getMobileSize(){
         return 32;
+    }
+
+    // returns a string template cast (if necessary) to the proper type to
+    // access the member in emitted code
+    // E.g. __c0bs32 has no member 'write', but its parent class __Channel32
+    // does
+    // if you pass the symbol 'chan1', and member 'write' for a __c0bs32,
+    // you'll get "((__Channel32)(chan1))->write"
+    // throws an exception if no member with that name exists
+    // (TODO add member selection by call signature)
+    // member is a String[] where each element of the array was a segmented
+    // ID component: "a.b.c.d" is passed as ['a','b','c','d']
+    public StringTemplate getMemberWithCast(String symbol, String[] member){
+        throw new UnknownMemberException(getName(), member[0]);
     }
     
 }
