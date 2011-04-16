@@ -184,7 +184,7 @@ public class DanType implements Serializable {
     // (TODO add member selection by call signature)
     // member is a String[] where each element of the array was a segmented
     // ID component: "a.b.c.d" is passed as ['a','b','c','d']
-    public StringTemplate getMemberWithCast(String symbol, String[] member){
+    public StringTemplate getMemberWithCast(StringTemplate symbolEnveleope, String symbol, String[] member){
         throw new UnknownMemberException(getName(), member[0]);
     }
     

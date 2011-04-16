@@ -79,7 +79,7 @@ public class BundleType extends DanType implements Serializable {
     }
 
     @Override
-    public StringTemplate getMemberWithCast(String symbol, String[] member){
+    public StringTemplate getMemberWithCast(StringTemplate symbolEnvelope, String symbol, String[] member){
         if(member.length < 1){
             throw new IllegalArgumentException("member[] must have at least one String");
         }
@@ -87,7 +87,8 @@ public class BundleType extends DanType implements Serializable {
             if(member.length > 1){
                 throw new NotImplementedException();
             }
-            return new StringTemplate(symbol + "." + member[0]);
+            symbolEnvelope.setAttribute("symbol", symbol);
+            return new StringTemplate(symbolEnvelope.toString() + "." + member[0]);
         }
         else{
             throw new UnknownMemberException(symbol, member[0]);
