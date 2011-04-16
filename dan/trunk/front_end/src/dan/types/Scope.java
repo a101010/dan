@@ -12,6 +12,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.antlr.runtime.Token;
+import org.antlr.stringtemplate.StringTemplate;
 
 /**
  * Represents a block scope in a ProcType.
@@ -41,14 +42,16 @@ public class Scope implements Serializable {
      * name. E.g., if a channel chan1 (type _c0bs32) is accessed as follows:
      * chan1.write
      * member 'write' is a member of __Channel32, so the correct code to
-     * emit is ((__Channel32)(locals->chan1)).write
+     * emit is 
+     * ((__Channel32*)&(locals->chan1))->write
+     * TODO need to verify whether this results in any overhead, or just reinterprets existing pointers
      * If not in scope, throws a ScopeException.
      * If in scope but member does not exist, throws FieldDoesNotExistException.
      * TODO does not work with methods, just fields.
      * @param symbol A Danger symbol.
      * @return The correct emitted name.
      */
-    public String GetEmittedName(Token symbol){
+    public StringTemplate GetEmittedName(StringTemplate symbolEnvelope, Token symbol){
         String symbolString = symbol.getText();
         String[] chunks = symbol.getText().split("\\.");
         Vardec v = null;
@@ -62,9 +65,10 @@ public class Scope implements Serializable {
             throw new ScopeException(symbol, " has not been declared (it is out of scope)");
         }
         if(chunks.length == 1){
-            return symbolString;
+            symbolEnvelope.setAttribute("symbol", symbolString);
+            return symbolEnvelope;
         }
-        return v.Type.getResolvedType().getMemberWithCast(chunks[0], ArrayUtils.tail(chunks)).toString();
+        return v.Type.getResolvedType().getMemberWithCast(symbolEnvelope, chunks[0], ArrayUtils.tail(chunks));
     }
 
     private Vardec IsInScope(String symbolName){

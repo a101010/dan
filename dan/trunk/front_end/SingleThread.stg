@@ -552,5 +552,9 @@ int main()
 >>
 
 cast(symbol, type, member) ::= <<
-((<type>)<symbol>).<member>
+((<type>*)(&<symbol>))-><member>
+>>
+
+localRef(symbol) ::= <<
+locals-><symbol>
 >>

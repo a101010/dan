@@ -223,12 +223,13 @@ public class ChannelType extends DanType implements Serializable {
     }
 
     @Override
-    public StringTemplate getMemberWithCast(String symbol, String[] member){
+    public StringTemplate getMemberWithCast(StringTemplate symbolEnvelope, String symbol, String[] member){
         if(member.length == 1){
             if(member[0].equals("read") || member[0].equals("write")){
+                symbolEnvelope.setAttribute("symbol", symbol);
                 StringTemplateGroup templateLib = TemplateGroupManager.getTemplateLib();
                 StringTemplate st = templateLib.getInstanceOf("cast", 
-                        new STAttrMap().put("symbol", symbol)
+                        new STAttrMap().put("symbol", symbolEnvelope)
                                         .put("type", "__Channel32")
                                         .put("member", member[0]));
                 return st;

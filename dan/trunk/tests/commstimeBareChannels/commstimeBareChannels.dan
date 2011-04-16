@@ -84,7 +84,7 @@ proc void Commstime()
         // This means they must be in a par, and must declare
         // the channel end static in their parameter list.
         // (These rules will also apply to statically allocated Mobile types)
-        Prefix(d.read, a.write);
+        Prefix(d.read, a.write, 0);
         Delta(a.read, b.write, c.write);
         Succ(c.read, d.write);
         Count(b.read);

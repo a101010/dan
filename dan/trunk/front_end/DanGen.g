@@ -477,7 +477,8 @@ exp	 	: literal { $exp.st = $literal.st; }
 			// If ID is a compound ID, e.g. foo.bar.baz, we need to start with foo and see if it is in scope.
 			// Then we can check whether it also has a member 'bar', etc.
 			// We check the current scope and then all parent scopes
-			$exp.st = new StringTemplate($procDec::currentScope.GetEmittedName($ID.getToken()));
+			StringTemplate symbolEnvelope = templateLib.getInstanceOf("localRef");
+			$exp.st = $procDec::currentScope.GetEmittedName(symbolEnvelope, $ID.getToken());
 			
 			
 		}
