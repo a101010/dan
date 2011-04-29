@@ -1,0 +1,8 @@
+syntax: glob
+trunk/front_end/output/DanGen.java
+trunk/front_end/output/DanGen.tokens
+trunk/front_end/output/DanGenH.java
+trunk/front_end/output/DanGenH.tokens
+trunk/front_end/output/DanProgLexer.java
+trunk/front_end/output/DanProgParser.java
+trunk/front_end/output/DanProg.tokens
